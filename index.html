@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siren Central Command & Control (CCC)</title>
+    <!-- Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; height: 100vh;
+        }
+        header {
+            background-color: var(--panel-bg);
+            padding: 12px 24px; display: flex;
+            justify-content: space-between; align-items: center;
+            border-bottom: 2px solid #334155;
+        }
+        .status-badge {
+            background: #064e3b; color: var(--accent-green);
+            padding: 6px 12px; border-radius: 20px;
+            font-size: 0.85rem; font-weight: bold; border: 1px solid var(--accent-green);
+        }
+        main { display: flex; flex: 1; overflow: hidden; }
+        #map { flex: 2; height: 100%; background: #000; }
+        #control-panel {
+            flex: 1; max-width: 420px; background-color: var(--panel-bg);
+            padding: 20px; display: flex; flex-direction: column; gap: 20px;
+            border-left: 2px solid #334155; box-sizing: border-box; overflow-y: auto;
+        }
+        .card {
+            background: #0f172a; border-radius: 8px;
+            padding: 16px; border: 1px solid #334155;
+        }
+        .card h3 { margin-top: 0; margin-bottom: 12px; color: var(--accent-blue); font-size: 1rem; }
+        select, button {
+            width: 100%; padding: 12px; border-radius: 6px;
+            border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px;
+        }
+        select { background: #334155; color: var(--text-main); }
+        .btn-tone { background: var(--accent-blue); color: white; }
+        .btn-stop { background: var(--accent-red); color: white; }
+        .btn-talk { background: var(--accent-green); color: white; }
+        .btn-talk:active { background: #059669; transform: scale(0.98); }
+        .telemetry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; }
+        .telemetry-item { background: #1e293b; padding: 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>🚨 Siren Central Command</h2>
+    <div id="vpn-status" class="status-badge">VPN: 3/3 Online</div>
+</header>
+
+<main>
+    <div id="map"></div>
+    <div id="control-panel">
+        
+        <!-- Target Selection -->
+        <div class="card">
+            <h3>1. Select Target</h3>
+            <select id="target-select">
+                <option value="ALL">📢 BROADCAST ALL SIRENS</option>
+                <optgroup label="Groups">
+                    <option value="GROUP_NORTH">North Sector</option>
+                    <option value="GROUP_COASTAL">Coastal Sector</option>
+                </optgroup>
+                <optgroup label="Individual Sirens">
+                    <option value="100.100.0.11">Siren 01 - North</option>
+                    <option value="100.100.0.12">Siren 02 - Central</option>
+                    <option value="100.100.0.13">Siren 03 - Coastal</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <!-- Alarm Controls -->
+        <div class="card">
+            <h3>2. Pre-Recorded Tone Controls</h3>
+            <select id="tone-select">
+                <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
+                <option value="TEST">System Test Tone (MMC Track 2)</option>
+                <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
+            </select>
+            <button class="btn-tone" onclick="sendToneCommand()">🔊 Play Selected Tone</button>
+            <button class="btn-stop" onclick="sendStopCommand()">⏹ STOP ALL ALARMS</button>
+        </div>
+
+        <!-- Live PA Voice Stream -->
+        <div class="card">
+            <h3>3. Live Public Announcement</h3>
+            <p style="font-size: 0.8rem; color: var(--text-sub);">Push and hold the button below to stream live microphone audio across selected sirens over WebRTC.</p>
+            <button id="talk-btn" class="btn-talk" onmousedown="startLivePA()" onmouseup="stopLivePA()">🎙 HOLD TO TALK</button>
+        </div>
+
+        <!-- Selected Siren Diagnostics -->
+        <div class="card">
+            <h3>4. Local Siren Telemetry (RS232)</h3>
+            <div class="telemetry-grid">
+                <div class="telemetry-item">Battery: <b id="tele-volts">27.2V</b></div>
+                <div class="telemetry-item">Amp Status: <b id="tele-amp">Ready</b></div>
+                <div class="telemetry-item">Driver Status: <b id="tele-driver">OK</b></div>
+                <div class="telemetry-item">Door Sensor: <b id="tele-door">Closed</b></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 1. Initialize Map
+    const map = L.map('map').setView([14.7500, 120.9500], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 2. Define Siren Sites
+    const sirens = [
+        { id: "100.100.0.11", name: "Siren 01 - North", lat: 14.7600, lng: 120.9500, status: "online" },
+        { id: "100.100.0.12", name: "Siren 02 - Central", lat: 14.7500, lng: 120.9600, status: "online" },
+        { id: "100.100.0.13", name: "Siren 03 - Coastal", lat: 14.7400, lng: 120.9400, status: "online" }
+    ];
+
+    sirens.forEach(s => {
+        const marker = L.circleMarker([s.lat, s.lng], {
+            color: s.status === 'online' ? '#10b981' : '#ef4444',
+            radius: 10, fillOpacity: 0.8
+        }).addTo(map);
+        marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}`);
+    });
+
+    // 3. Execution Logic
+    const BACKEND_URL = "http://localhost:8000"; // Local Central Server API
+
+    function sendToneCommand() {
+        const target = document.getElementById('target-select').value;
+        const tone = document.getElementById('tone-select').value;
+        fetch(`${BACKEND_URL}/api/trigger`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'PLAY', target: target, tone: tone })
+        }).then(r => alert(`Triggered ${tone} on ${target}`));
+    }
+
+    function sendStopCommand() {
+        const target = document.getElementById('target-select').value;
+        fetch(`${BACKEND_URL}/api/trigger`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'STOP', target: target })
+        }).then(r => alert(`Stopped Alarms on ${target}`));
+    }
+
+    // 4. Live Voice Streaming Setup
+    let mediaRecorder;
+    function startLivePA() {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start(100); // 100ms chunks
+            mediaRecorder.ondataavailable = e => {
+                // Send raw audio chunks to backend WebSocket over VPN
+            };
+            document.getElementById('talk-btn').innerText = "🔴 BROADCASTING LIVE...";
+        });
+    }
+
+    function stopLivePA() {
+        if(mediaRecorder) mediaRecorder.stop();
+        document.getElementById('talk-btn').innerText = "🎙 HOLD TO TALK";
+    }
+</script>
+</body>
+</html>
