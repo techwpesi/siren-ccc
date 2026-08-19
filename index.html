@@ -166,23 +166,41 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-    // 4. Live Voice Streaming Setup
-    let mediaRecorder;
-    function startLivePA() {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.start(100); // 100ms chunks
-            mediaRecorder.ondataavailable = e => {
-                // Send raw audio chunks to backend WebSocket over VPN
-            };
-            document.getElementById('talk-btn').innerText = "🔴 BROADCASTING LIVE...";
-        });
+// 4. Live Voice Streaming Setup
+let mediaRecorder;
+let audioStream; // Store reference to hardware microphone stream
+
+function startLivePA() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        audioStream = stream; // Save reference to hardware tracks
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.start(100); // Send 100ms chunks
+        mediaRecorder.ondataavailable = e => {
+            // Send raw audio chunks over WebSocket to Python backend
+        };
+        
+        document.getElementById('talk-btn').innerText = "🔴 BROADCASTING LIVE...";
+    }).catch(err => {
+        console.error("Microphone access denied:", err);
+    });
+}
+
+function stopLivePA() {
+    // 1. Stop the MediaRecorder instance
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+    }
+    
+    // 2. Shut down hardware microphone tracks to release Chrome indicator
+    if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+        audioStream = null; // Clear stream reference
     }
 
-    function stopLivePA() {
-        if(mediaRecorder) mediaRecorder.stop();
-        document.getElementById('talk-btn').innerText = "🎙 HOLD TO TALK";
-    }
+    // 3. Reset Button UI Label
+    document.getElementById('talk-btn').innerText = "🎙 HOLD TO TALK";
+}
 </script>
 </body>
 </html>
