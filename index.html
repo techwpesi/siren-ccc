@@ -103,7 +103,8 @@
         <div class="card">
             <h3>3. Live Public Announcement</h3>
             <p style="font-size: 0.8rem; color: var(--text-sub);">Push and hold the button below to stream live microphone audio across selected sirens over WebRTC.</p>
-            <button id="talk-btn" class="btn-talk" onmousedown="startLivePA()" onmouseup="stopLivePA()">🎙 HOLD TO TALK</button>
+            <button id="start-btn" class="btn-talk" onclick="startLivePA()">🎙 START BROADCAST</button>
+            <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
         </div>
 
         <!-- Selected Siren Diagnostics -->
@@ -166,40 +167,45 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-// 4. Live Voice Streaming Setup
+// 4. Two-Button Live Voice Setup
 let mediaRecorder;
-let audioStream; // Store reference to hardware microphone stream
+let audioStream;
 
 function startLivePA() {
+    if (audioStream) return; // Prevent duplicate streams if already active
+
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        audioStream = stream; // Save reference to hardware tracks
+        audioStream = stream;
         mediaRecorder = new MediaRecorder(stream);
         
-        mediaRecorder.start(100); // Send 100ms chunks
+        mediaRecorder.start(100);
         mediaRecorder.ondataavailable = e => {
-            // Send raw audio chunks over WebSocket to Python backend
+            // Send audio chunks to Python backend
         };
         
-        document.getElementById('talk-btn').innerText = "🔴 BROADCASTING LIVE...";
+        // Visual indicator that broadcast is active
+        document.getElementById('start-btn').style.background = "#ef4444"; // Red alert color
+        document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
     }).catch(err => {
-        console.error("Microphone access denied:", err);
+        alert("Microphone access denied or missing!");
     });
 }
 
 function stopLivePA() {
-    // 1. Stop the MediaRecorder instance
+    // 1. Stop recorder
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
     }
     
-    // 2. Shut down hardware microphone tracks to release Chrome indicator
+    // 2. Shut down hardware microphone tracks to release mic
     if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
-        audioStream = null; // Clear stream reference
+        audioStream = null;
     }
 
-    // 3. Reset Button UI Label
-    document.getElementById('talk-btn').innerText = "🎙 HOLD TO TALK";
+    // 3. Reset Button UI Labels
+    document.getElementById('start-btn').style.background = "#10b981"; // Reset green
+    document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
 }
 </script>
 </body>
