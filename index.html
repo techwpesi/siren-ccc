@@ -167,54 +167,64 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-// 4. Live Voice Setup (Raw PCM Stream for Python 3.14 compatibility)
     let audioCtx;
     let micStream;
 
     function startLivePA() {
-        if (micStream) return; // Prevent duplicate streams
+        if (micStream) return;
 
         const target = document.getElementById('target-select').value;
 
-        // A. Trigger Mac Mini into PA_BROADCAST mode
+        // 1. Trigger remote PC listener
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
         });
 
-        // B. Capture raw 16-bit PCM directly from browser Web Audio API
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        // 2. Request mic audio with explicit 44.1kHz constraints
+        navigator.mediaDevices.getUserMedia({ 
+            audio: { 
+                sampleRate: 44100,
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true
+            } 
+        }).then(stream => {
             micStream = stream;
+            
+            // Create AudioContext matching target rate
             audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
             
             const source = audioCtx.createMediaStreamSource(stream);
-            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+            // 4096 buffer size yields smooth chunks over local network
+            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
             processor.onaudioprocess = e => {
-                const float32Data = e.inputBuffer.getChannelData(0);
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcmBuffer = new Int16Array(inputData.length);
                 
-                // Convert Float32 audio samples to 16-bit Int PCM
-                const int16Data = new Int16Array(float32Data.length);
-                for (let i = 0; i < float32Data.length; i++) {
-                    int16Data[i] = Math.max(-1, Math.min(1, float32Data[i])) * 0x7FFF;
+                // Scale float [-1.0, 1.0] to 16-bit signed PCM integers
+                for (let i = 0; i < inputData.length; i++) {
+                    let s = Math.max(-1, Math.min(1, inputData[i]));
+                    pcmBuffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
 
-                // POST raw PCM bytes directly to server
+                // Send raw byte buffer directly
                 fetch(`${BACKEND_URL}/api/stream_audio`, {
                     method: 'POST',
-                    body: int16Data.buffer
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: pcmBuffer.buffer
                 });
             };
 
             source.connect(processor);
             processor.connect(audioCtx.destination);
 
-            // UI visual feedback
             document.getElementById('start-btn').style.background = "#ef4444";
             document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
         }).catch(err => {
-            alert("Microphone access denied or missing!");
+            alert("Microphone access denied: " + err);
         });
     }
 
