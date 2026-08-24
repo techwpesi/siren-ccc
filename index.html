@@ -188,7 +188,8 @@
                 sampleRate: 44100,
                 channelCount: 1,
                 echoCancellation: true,
-                noiseSuppression: true
+                noiseSuppression: true, 
+                autoGainControl: true
             } 
         }).then(stream => {
             micStream = stream;
