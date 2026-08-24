@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Siren Central Command & Control (CCC)</title>
     <!-- Leaflet.js CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -10,53 +10,188 @@
         :root {
             --bg-dark: #0f172a;
             --panel-bg: #1e293b;
+            --card-bg: #0f172a;
             --accent-blue: #3b82f6;
             --accent-green: #10b981;
             --accent-red: #ef4444;
             --text-main: #f8fafc;
             --text-sub: #94a3b8;
+            --border-color: #334155;
         }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            margin: 0; padding: 0;
+            margin: 0; 
+            padding: 0;
             background-color: var(--bg-dark);
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex; flex-direction: column; height: 100vh;
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh;
         }
+
         header {
             background-color: var(--panel-bg);
-            padding: 12px 24px; display: flex;
-            justify-content: space-between; align-items: center;
-            border-bottom: 2px solid #334155;
+            padding: 12px 20px; 
+            display: flex;
+            justify-content: space-between; 
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
+
+        header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .status-badge {
-            background: #064e3b; color: var(--accent-green);
-            padding: 6px 12px; border-radius: 20px;
-            font-size: 0.85rem; font-weight: bold; border: 1px solid var(--accent-green);
+            background: #064e3b; 
+            color: var(--accent-green);
+            padding: 6px 12px; 
+            border-radius: 20px;
+            font-size: 0.8rem; 
+            font-weight: bold; 
+            border: 1px solid var(--accent-green);
+            white-space: nowrap;
         }
-        main { display: flex; flex: 1; overflow: hidden; }
-        #map { flex: 2; height: 100%; background: #000; }
+
+        /* Responsive Layout Engine */
+        main { 
+            display: flex; 
+            flex-direction: column; /* Mobile Default: Stacked Cards */
+            flex: 1; 
+            width: 100%;
+        }
+
+        #map-container {
+            width: 100%;
+            height: 260px; /* Fixed map height on mobile */
+            position: relative;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        #map { 
+            width: 100%; 
+            height: 100%; 
+            background: #000; 
+        }
+
         #control-panel {
-            flex: 1; max-width: 420px; background-color: var(--panel-bg);
-            padding: 20px; display: flex; flex-direction: column; gap: 20px;
-            border-left: 2px solid #334155; box-sizing: border-box; overflow-y: auto;
+            flex: 1; 
+            width: 100%;
+            background-color: var(--panel-bg);
+            padding: 16px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px;
         }
+
+        /* Mobile Card Styling */
         .card {
-            background: #0f172a; border-radius: 8px;
-            padding: 16px; border: 1px solid #334155;
+            background: var(--card-bg); 
+            border-radius: 10px;
+            padding: 16px; 
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
         }
-        .card h3 { margin-top: 0; margin-bottom: 12px; color: var(--accent-blue); font-size: 1rem; }
+
+        .card h3 { 
+            margin-top: 0; 
+            margin-bottom: 12px; 
+            color: var(--accent-blue); 
+            font-size: 0.95rem; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         select, button {
-            width: 100%; padding: 12px; border-radius: 6px;
-            border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px;
+            width: 100%; 
+            padding: 14px; /* Larger touch targets for mobile */
+            border-radius: 8px;
+            border: none; 
+            font-size: 0.95rem;
+            font-weight: bold; 
+            cursor: pointer; 
+            margin-bottom: 10px;
+            touch-action: manipulation;
         }
-        select { background: #334155; color: var(--text-main); }
+
+        select { 
+            background: #334155; 
+            color: var(--text-main); 
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F8FAFC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px top 50%;
+            background-size: 12px auto;
+        }
+
         .btn-tone { background: var(--accent-blue); color: white; }
         .btn-stop { background: var(--accent-red); color: white; }
         .btn-talk { background: var(--accent-green); color: white; }
         .btn-talk:active { background: #059669; transform: scale(0.98); }
-        .telemetry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; }
-        .telemetry-item { background: #1e293b; padding: 8px; border-radius: 4px; }
+
+        .telemetry-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+            font-size: 0.85rem; 
+        }
+
+        .telemetry-item { 
+            background: #1e293b; 
+            padding: 10px; 
+            border-radius: 6px; 
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .telemetry-item span {
+            color: var(--text-sub);
+            font-size: 0.75rem;
+        }
+
+        /* Desktop View (Screens wider than 768px) */
+        @media (min-width: 769px) {
+            body {
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            header h2 {
+                font-size: 1.4rem;
+            }
+
+            main { 
+                flex-direction: row; /* Desktop: Side-by-Side */
+                overflow: hidden;
+            }
+
+            #map-container {
+                flex: 2;
+                height: 100%;
+                border-bottom: none;
+            }
+
+            #control-panel {
+                flex: 1; 
+                max-width: 420px; 
+                border-left: 2px solid var(--border-color);
+                overflow-y: auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -67,10 +202,13 @@
 </header>
 
 <main>
-    <div id="map"></div>
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+    
     <div id="control-panel">
         
-        <!-- Target Selection -->
+        <!-- Target Selection Card -->
         <div class="card">
             <h3>1. Select Target</h3>
             <select id="target-select">
@@ -87,7 +225,7 @@
             </select>
         </div>
 
-        <!-- Alarm Controls -->
+        <!-- Pre-Recorded Tone Controls Card -->
         <div class="card">
             <h3>2. Pre-Recorded Tone Controls</h3>
             <select id="tone-select">
@@ -99,22 +237,24 @@
             <button class="btn-stop" onclick="sendStopCommand()">⏹ STOP ALL ALARMS</button>
         </div>
 
-        <!-- Live PA Voice Stream -->
+        <!-- Live PA Stream Card -->
         <div class="card">
             <h3>3. Live Public Announcement</h3>
-            <p style="font-size: 0.8rem; color: var(--text-sub);">Click START BROADCAST to stream live microphone audio across selected sirens over Tailscale.</p>
+            <p style="font-size: 0.8rem; color: var(--text-sub); margin-top: 0; margin-bottom: 12px;">
+                Stream live microphone audio across selected sirens over Tailscale.
+            </p>
             <button id="start-btn" class="btn-talk" onclick="startLivePA()">🎙 START BROADCAST</button>
             <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
         </div>
 
-        <!-- Selected Siren Diagnostics -->
+        <!-- Local Siren Telemetry Card -->
         <div class="card">
             <h3>4. Local Siren Telemetry (RS232)</h3>
             <div class="telemetry-grid">
-                <div class="telemetry-item">Battery: <b id="tele-volts">27.2V</b></div>
-                <div class="telemetry-item">Amp Status: <b id="tele-amp">Ready</b></div>
-                <div class="telemetry-item">Driver Status: <b id="tele-driver">OK</b></div>
-                <div class="telemetry-item">Door Sensor: <b id="tele-door">Closed</b></div>
+                <div class="telemetry-item"><span>Battery</span><b id="tele-volts">27.2V</b></div>
+                <div class="telemetry-item"><span>Amp Status</span><b id="tele-amp">Ready</b></div>
+                <div class="telemetry-item"><span>Driver Status</span><b id="tele-driver">OK</b></div>
+                <div class="telemetry-item"><span>Door Sensor</span><b id="tele-door">Closed</b></div>
             </div>
         </div>
 
@@ -145,8 +285,11 @@
         marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}`);
     });
 
+    // Fix map rendering bug when resizing or loading on mobile viewports
+    setTimeout(() => { map.invalidateSize(); }, 500);
+
     // 3. Execution Logic
-    const BACKEND_URL = "http://100.118.197.82:8080"; // Laptop Central Server API
+    const BACKEND_URL = "http://100.118.197.82:8080"; 
 
     function sendToneCommand() {
         const target = document.getElementById('target-select').value;
@@ -167,7 +310,7 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-let micStream;
+    let micStream;
     let audioCtx;
     let broadcastInterval;
 
@@ -176,14 +319,12 @@ let micStream;
 
         const target = document.getElementById('target-select').value;
 
-        // 1. Tell Mac Mini to enter PA mode
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
         });
 
-        // 2. Open Mic & Record 5-second PCM WAV blocks
         navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 44100, channelCount: 1 } }).then(stream => {
             micStream = stream;
 
@@ -203,7 +344,6 @@ let micStream;
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
 
-                // Collect 5 seconds of audio, compile to WAV header, and POST
                 setTimeout(() => {
                     processor.disconnect();
                     source.disconnect();
@@ -211,7 +351,6 @@ let micStream;
 
                     if (pcmBuffers.length === 0) return;
 
-                    // Flatten audio buffers
                     let totalSamples = pcmBuffers.reduce((acc, b) => acc + b.length, 0);
                     let samples = new Float32Array(totalSamples);
                     let offset = 0;
@@ -220,7 +359,6 @@ let micStream;
                         offset += b.length;
                     }
 
-                    // Build 16-bit WAV File Blob
                     const wavBlob = encodeWAV(samples, 44100);
                     
                     fetch(`${BACKEND_URL}/api/stream_audio`, {
@@ -229,37 +367,35 @@ let micStream;
                         body: wavBlob
                     });
 
-                }, 5000); // 5-second block
+                }, 5000); 
             }
 
             recordAndSendWavChunk();
             broadcastInterval = setInterval(recordAndSendWavChunk, 5200);
 
             document.getElementById('start-btn').style.background = "#ef4444";
-            document.getElementById('start-btn').innerText = "🔴 BROADCASTING (5s CHUNKS)...";
+            document.getElementById('start-btn').innerText = "🔴 BROADCASTING...";
         }).catch(err => alert("Mic Access Error: " + err));
     }
 
-    // Helper: Encodes Float32 samples into a standard 16-bit PCM WAV Blob
     function encodeWAV(samples, sampleRate) {
         let buffer = new ArrayBuffer(44 + samples.length * 2);
         let view = new DataView(buffer);
 
-        /* RIFF identifier */ writeString(view, 0, 'RIFF');
-        /* RIFF chunk length */ view.setUint32(4, 36 + samples.length * 2, true);
-        /* RIFF type */ writeString(view, 8, 'WAVE');
-        /* format chunk identifier */ writeString(view, 12, 'fmt ');
-        /* format chunk length */ view.setUint32(16, 16, true);
-        /* sample format (raw PCM) */ view.setUint16(20, 1, true);
-        /* channel count (Mono) */ view.setUint16(22, 1, true);
-        /* sample rate */ view.setUint32(24, sampleRate, true);
-        /* byte rate */ view.setUint32(28, sampleRate * 2, true);
-        /* block align */ view.setUint16(32, 2, true);
-        /* bits per sample */ view.setUint16(34, 16, true);
-        /* data chunk identifier */ writeString(view, 36, 'data');
-        /* data chunk length */ view.setUint32(40, samples.length * 2, true);
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, samples.length * 2, true);
 
-        // Convert Float32 to 16-bit PCM
         let lng = samples.length;
         let index = 44;
         for (let i = 0; i < lng; i++) {
@@ -294,7 +430,6 @@ let micStream;
         document.getElementById('start-btn').style.background = "#10b981";
         document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
     }
-
 </script>
 </body>
 </html>
