@@ -80,7 +80,7 @@
                     <option value="GROUP_COASTAL">Coastal Sector</option>
                 </optgroup>
                 <optgroup label="Individual Sirens">
-                    <option value="100.73.27.54">Siren 01 - North</option>
+                    <option value="100.73.27.54">Siren 01 - Mac Mini Site</option>
                     <option value="100.100.0.12">Siren 02 - Central</option>
                     <option value="100.100.0.13">Siren 03 - Coastal</option>
                 </optgroup>
@@ -102,7 +102,7 @@
         <!-- Live PA Voice Stream -->
         <div class="card">
             <h3>3. Live Public Announcement</h3>
-            <p style="font-size: 0.8rem; color: var(--text-sub);">Push and hold the button below to stream live microphone audio across selected sirens over WebRTC.</p>
+            <p style="font-size: 0.8rem; color: var(--text-sub);">Click START BROADCAST to stream live microphone audio across selected sirens over Tailscale.</p>
             <button id="start-btn" class="btn-talk" onclick="startLivePA()">🎙 START BROADCAST</button>
             <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
         </div>
@@ -131,7 +131,7 @@
     }).addTo(map);
 
     // 2. Define Siren Sites
-const sirens = [
+    const sirens = [
         { id: "100.73.27.54", name: "Siren 01 - Mac Mini Site", lat: 14.7600, lng: 120.9500, status: "online" },
         { id: "100.100.0.12", name: "Siren 02 - Central", lat: 14.7500, lng: 120.9600, status: "online" },
         { id: "100.100.0.13", name: "Siren 03 - Coastal", lat: 14.7400, lng: 120.9400, status: "online" }
@@ -146,7 +146,7 @@ const sirens = [
     });
 
     // 3. Execution Logic
-    const BACKEND_URL = "http://100.118.197.82:8080"; // Local Central Server API
+    const BACKEND_URL = "http://100.118.197.82:8080"; // Laptop Central Server API
 
     function sendToneCommand() {
         const target = document.getElementById('target-select').value;
@@ -167,46 +167,71 @@ const sirens = [
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-// 4. Two-Button Live Voice Setup
-let mediaRecorder;
-let audioStream;
+    // 4. Live Voice Streaming Setup
+    let mediaRecorder;
+    let audioStream;
 
-function startLivePA() {
-    if (audioStream) return; // Prevent duplicate streams if already active
+    function startLivePA() {
+        if (audioStream) return; // Prevent duplicate streams if already active
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        audioStream = stream;
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.start(100);
-        mediaRecorder.ondataavailable = e => {
-            // Send audio chunks to Python backend
-        };
-        
-        // Visual indicator that broadcast is active
-        document.getElementById('start-btn').style.background = "#ef4444"; // Red alert color
-        document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
-    }).catch(err => {
-        alert("Microphone access denied or missing!");
-    });
-}
+        const target = document.getElementById('target-select').value;
 
-function stopLivePA() {
-    // 1. Stop recorder
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
+        // A. Trigger Mac Mini into PA_BROADCAST mode over Tailscale
+        fetch(`${BACKEND_URL}/api/trigger`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
+        });
+
+        // B. Capture Microphone & Stream Audio Chunks
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+            audioStream = stream;
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) {
+                    fetch(`${BACKEND_URL}/api/stream_audio`, {
+                        method: 'POST',
+                        body: e.data
+                    });
+                }
+            };
+            
+            mediaRecorder.start(200); // Stream chunk every 200ms
+            
+            // UI visual feedback
+            document.getElementById('start-btn').style.background = "#ef4444";
+            document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
+        }).catch(err => {
+            alert("Microphone access denied or missing!");
+        });
     }
-    
-    // 2. Shut down hardware microphone tracks to release mic
-    if (audioStream) {
-        audioStream.getTracks().forEach(track => track.stop());
-        audioStream = null;
-    }
 
-    // 3. Reset Button UI Labels
-    document.getElementById('start-btn').style.background = "#10b981"; // Reset green
-    document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
-}
+    function stopLivePA() {
+        const target = document.getElementById('target-select').value;
+
+        // 1. Stop recorder
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+        }
+        
+        // 2. Shut down hardware microphone tracks
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+            audioStream = null;
+        }
+
+        // 3. Send STOP command to cut Mac Mini stream listener
+        fetch(`${BACKEND_URL}/api/trigger`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'STOP', target: target })
+        });
+
+        // 4. Reset Button UI Labels
+        document.getElementById('start-btn').style.background = "#10b981";
+        document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
+    }
 </script>
 </body>
 </html>
