@@ -167,44 +167,49 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-    // 4. Live Voice Streaming Setup
-    let mediaRecorder;
-    let audioStream;
+// 4. Live Voice Setup (Raw PCM Stream for Python 3.14 compatibility)
+    let audioCtx;
+    let micStream;
 
-function startLivePA() {
-        if (audioStream) return; // Prevent duplicate streams if already active
+    function startLivePA() {
+        if (micStream) return; // Prevent duplicate streams
 
         const target = document.getElementById('target-select').value;
 
-        // A. Trigger Mac Mini into PA_BROADCAST mode over Tailscale
+        // A. Trigger Mac Mini into PA_BROADCAST mode
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
         });
 
-        // B. Capture Microphone & Stream Audio Chunks
+        // B. Capture raw 16-bit PCM directly from browser Web Audio API
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            audioStream = stream;
+            micStream = stream;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
             
-            // Force supported audio mimeType
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-                ? 'audio/webm;codecs=opus' 
-                : 'audio/ogg';
+            const source = audioCtx.createMediaStreamSource(stream);
+            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            
-            mediaRecorder.ondataavailable = e => {
-                if (e.data.size > 0) {
-                    fetch(`${BACKEND_URL}/api/stream_audio`, {
-                        method: 'POST',
-                        body: e.data
-                    });
+            processor.onaudioprocess = e => {
+                const float32Data = e.inputBuffer.getChannelData(0);
+                
+                // Convert Float32 audio samples to 16-bit Int PCM
+                const int16Data = new Int16Array(float32Data.length);
+                for (let i = 0; i < float32Data.length; i++) {
+                    int16Data[i] = Math.max(-1, Math.min(1, float32Data[i])) * 0x7FFF;
                 }
+
+                // POST raw PCM bytes directly to server
+                fetch(`${BACKEND_URL}/api/stream_audio`, {
+                    method: 'POST',
+                    body: int16Data.buffer
+                });
             };
-            
-            mediaRecorder.start(200); // Stream chunk every 200ms
-            
+
+            source.connect(processor);
+            processor.connect(audioCtx.destination);
+
             // UI visual feedback
             document.getElementById('start-btn').style.background = "#ef4444";
             document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
@@ -216,25 +221,24 @@ function startLivePA() {
     function stopLivePA() {
         const target = document.getElementById('target-select').value;
 
-        // 1. Stop recorder
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-            mediaRecorder.stop();
+        // 1. Close Web Audio Context & Stop Tracks
+        if (audioCtx) {
+            audioCtx.close();
+            audioCtx = null;
         }
-        
-        // 2. Shut down hardware microphone tracks
-        if (audioStream) {
-            audioStream.getTracks().forEach(track => track.stop());
-            audioStream = null;
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+            micStream = null;
         }
 
-        // 3. Send STOP command to cut Mac Mini stream listener
+        // 2. Send STOP command to cut Mac Mini stream listener
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'STOP', target: target })
         });
 
-        // 4. Reset Button UI Labels
+        // 3. Reset Button UI Labels
         document.getElementById('start-btn').style.background = "#10b981";
         document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
     }
