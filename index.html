@@ -171,7 +171,7 @@
     let mediaRecorder;
     let audioStream;
 
-    function startLivePA() {
+function startLivePA() {
         if (audioStream) return; // Prevent duplicate streams if already active
 
         const target = document.getElementById('target-select').value;
@@ -186,7 +186,13 @@
         // B. Capture Microphone & Stream Audio Chunks
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
             audioStream = stream;
-            mediaRecorder = new MediaRecorder(stream);
+            
+            // Force supported audio mimeType
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+                ? 'audio/webm;codecs=opus' 
+                : 'audio/ogg';
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             
             mediaRecorder.ondataavailable = e => {
                 if (e.data.size > 0) {
