@@ -167,63 +167,63 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-    let audioCtx;
+    let mediaRecorder;
     let micStream;
+    let broadcastInterval;
 
     function startLivePA() {
         if (micStream) return;
 
         const target = document.getElementById('target-select').value;
 
-        // 1. Trigger remote PC listener
+        // 1. Trigger remote PC listener to prepare for PA mode
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
         });
 
-        // 2. Request mic audio with explicit 44.1kHz constraints
-        navigator.mediaDevices.getUserMedia({ 
-            audio: { 
-                sampleRate: 44100,
-                channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true, 
-                autoGainControl: true
-            } 
-        }).then(stream => {
+        // 2. Start recording in 5-second loops
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
             micStream = stream;
             
-            // Create AudioContext matching target rate
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-            
-            const source = audioCtx.createMediaStreamSource(stream);
-            // 4096 buffer size yields smooth chunks over local network
-            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+            function recordAndSendChunk() {
+                if (!micStream) return;
 
-            processor.onaudioprocess = e => {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const pcmBuffer = new Int16Array(inputData.length);
-                
-                // Scale float [-1.0, 1.0] to 16-bit signed PCM integers
-                for (let i = 0; i < inputData.length; i++) {
-                    let s = Math.max(-1, Math.min(1, inputData[i]));
-                    pcmBuffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
+                let chunks = [];
+                mediaRecorder = new MediaRecorder(stream);
 
-                // Send raw byte buffer directly
-                fetch(`${BACKEND_URL}/api/stream_audio`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/octet-stream' },
-                    body: pcmBuffer.buffer
-                });
-            };
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
 
-            source.connect(processor);
-            processor.connect(audioCtx.destination);
+                mediaRecorder.onstop = () => {
+                    if (chunks.length > 0) {
+                        const blob = new Blob(chunks, { type: 'audio/webm' });
+                        // Upload complete 5-second audio file
+                        fetch(`${BACKEND_URL}/api/stream_audio`, {
+                            method: 'POST',
+                            body: blob
+                        });
+                    }
+                };
+
+                mediaRecorder.start();
+
+                // Stop this chunk after 5 seconds to trigger 'onstop' upload
+                setTimeout(() => {
+                    if (mediaRecorder && mediaRecorder.state === "recording") {
+                        mediaRecorder.stop();
+                    }
+                }, 5000); 
+            }
+
+            // Immediately send first 5-second block, then loop every 5 seconds
+            recordAndSendChunk();
+            broadcastInterval = setInterval(recordAndSendChunk, 5100);
 
             document.getElementById('start-btn').style.background = "#ef4444";
-            document.getElementById('start-btn').innerText = "🔴 BROADCASTING LIVE...";
+            document.getElementById('start-btn').innerText = "🔴 BROADCASTING (5s CHUNKS)...";
         }).catch(err => {
             alert("Microphone access denied: " + err);
         });
@@ -232,27 +232,27 @@
     function stopLivePA() {
         const target = document.getElementById('target-select').value;
 
-        // 1. Close Web Audio Context & Stop Tracks
-        if (audioCtx) {
-            audioCtx.close();
-            audioCtx = null;
+        // Stop interval loop
+        if (broadcastInterval) clearInterval(broadcastInterval);
+
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
         }
         if (micStream) {
             micStream.getTracks().forEach(track => track.stop());
             micStream = null;
         }
 
-        // 2. Send STOP command to cut Mac Mini stream listener
         fetch(`${BACKEND_URL}/api/trigger`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'STOP', target: target })
         });
 
-        // 3. Reset Button UI Labels
         document.getElementById('start-btn').style.background = "#10b981";
         document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
     }
+
 </script>
 </body>
 </html>
