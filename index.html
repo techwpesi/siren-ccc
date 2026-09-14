@@ -14,6 +14,7 @@
             --accent-blue: #3b82f6;
             --accent-green: #10b981;
             --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
             --text-main: #f8fafc;
             --text-sub: #94a3b8;
             --border-color: #334155;
@@ -63,6 +64,19 @@
             font-weight: bold; 
             border: 1px solid var(--accent-green);
             white-space: nowrap;
+            transition: background 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        .status-badge.degraded {
+            background: #451a03;
+            color: var(--accent-amber);
+            border-color: var(--accent-amber);
+        }
+
+        .status-badge.offline {
+            background: #450a0a;
+            color: var(--accent-red);
+            border-color: var(--accent-red);
         }
 
         /* Responsive Layout Engine */
@@ -112,7 +126,23 @@
             font-size: 0.95rem; 
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
         }
+
+        .card h3 .sub-status {
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 12px;
+        }
+
+        .sub-status.online { background: #064e3b; color: var(--accent-green); }
+        .sub-status.offline { background: #450a0a; color: var(--accent-red); }
 
         select, button {
             width: 100%; 
@@ -163,6 +193,17 @@
             font-size: 0.75rem;
         }
 
+        .telemetry-item b.ok { color: var(--accent-green); }
+        .telemetry-item b.warn { color: var(--accent-amber); }
+        .telemetry-item b.bad { color: var(--accent-red); }
+
+        .telemetry-note {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            margin-top: 10px;
+            margin-bottom: 0;
+        }
+
         /* Desktop View (Screens wider than 768px) */
         @media (min-width: 769px) {
             body {
@@ -198,7 +239,7 @@
 
 <header>
     <h2>🚨 Siren Central Command</h2>
-    <div id="vpn-status" class="status-badge">VPN: 3/3 Online</div>
+    <div id="vpn-status" class="status-badge">Checking sites...</div>
 </header>
 
 <main>
@@ -250,13 +291,21 @@
 
         <!-- Local Siren Telemetry Card -->
         <div class="card">
-            <h3>4. Local Siren Telemetry (RS232)</h3>
+            <h3>
+                <span>4. Site Telemetry (RS232)</span>
+                <span id="tele-conn-badge" class="sub-status offline">OFFLINE</span>
+            </h3>
             <div class="telemetry-grid">
-                <div class="telemetry-item"><span>Battery</span><b id="tele-volts">27.2V</b></div>
-                <div class="telemetry-item"><span>Amp Status</span><b id="tele-amp">Ready</b></div>
-                <div class="telemetry-item"><span>Driver Status</span><b id="tele-driver">OK</b></div>
-                <div class="telemetry-item"><span>Door Sensor</span><b id="tele-door">Closed</b></div>
+                <div class="telemetry-item"><span>Client Connection</span><b id="tele-conn">--</b></div>
+                <div class="telemetry-item"><span>Siren Active</span><b id="tele-active">--</b></div>
+                <div class="telemetry-item"><span>Battery</span><b id="tele-volts">--</b></div>
+                <div class="telemetry-item"><span>Amp Status</span><b id="tele-amp">--</b></div>
+                <div class="telemetry-item"><span>Driver Status</span><b id="tele-driver">--</b></div>
+                <div class="telemetry-item"><span>Door Sensor</span><b id="tele-door">--</b></div>
+                <div class="telemetry-item"><span>Power Supply</span><b id="tele-power">--</b></div>
+                <div class="telemetry-item"><span>Volume</span><b id="tele-vol">--</b></div>
             </div>
+            <p class="telemetry-note" id="tele-note">Select a single siren above to see its live RS232 status.</p>
         </div>
 
     </div>
@@ -273,18 +322,22 @@
 
     // 2. Define Siren Sites
     const sirens = [
-        { id: "100.73.27.54", name: "Siren 01 - Mac Mini Site", lat: 7.286230521570723, lng: 125.39038400617271, status: "online" },
-        { id: "100.118.38.113", name: "Siren 02 - Dell Optiplex", lat: 10.39172186580916, lng: 123.84760252637886, status: "online" },
-        { id: "100.107.59.42", name: "Siren 03 - Lenovo Laptop (Server)", lat: 14.77495, lng: 120.95797, status: "online" },
-        //{ id: "100.100.0.13", name: "Siren 03 - Coastal", lat: 14.7400, lng: 120.9400, status: "online" }
+        { id: "100.73.27.54", name: "Siren 01 - Mac Mini Site", lat: 7.286230521570723, lng: 125.39038400617271 },
+        { id: "100.118.38.113", name: "Siren 02 - Dell Optiplex", lat: 10.39172186580916, lng: 123.84760252637886 },
+        { id: "100.107.59.42", name: "Siren 03 - Lenovo Laptop (Server)", lat: 14.77495, lng: 120.95797 },
+        //{ id: "100.100.0.13", name: "Siren 03 - Coastal", lat: 14.7400, lng: 120.9400 }
     ];
 
+    // Markers are stored by site id so status polling can recolor them
+    // in place instead of re-adding markers every poll.
+    const siteMarkers = {};
     sirens.forEach(s => {
         const marker = L.circleMarker([s.lat, s.lng], {
-            color: s.status === 'online' ? '#10b981' : '#ef4444',
+            color: '#64748b', // neutral grey until first status poll lands
             radius: 10, fillOpacity: 0.8
         }).addTo(map);
-        marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}`);
+        marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}<br>Status: checking...`);
+        siteMarkers[s.id] = { marker, name: s.name };
     });
 
     // Fix map rendering bug when resizing or loading on mobile viewports
@@ -432,6 +485,128 @@
         document.getElementById('start-btn').style.background = "#10b981";
         document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
     }
+
+    // ============================================================
+    // 4. Live status polling: client connectivity + RS232 telemetry
+    // ============================================================
+    const STATUS_POLL_MS = 5000;
+    let lastStatusData = {}; // site_id -> status object from /api/status
+
+    async function pollStatus() {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/status`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            lastStatusData = await res.json();
+            applyStatusToMap();
+            applyStatusToHeader();
+            updateTelemetryPanel();
+        } catch (err) {
+            // Server itself unreachable - reflect that honestly rather than
+            // pretending sites are offline.
+            document.getElementById('vpn-status').textContent = 'Server unreachable';
+            document.getElementById('vpn-status').className = 'status-badge offline';
+        }
+    }
+
+    function applyStatusToMap() {
+        Object.entries(siteMarkers).forEach(([id, { marker, name }]) => {
+            const s = lastStatusData[id];
+            const online = s ? s.online : false;
+            marker.setStyle({ color: online ? '#10b981' : '#ef4444' });
+            const lastSeen = s && s.last_seen_seconds_ago !== null
+                ? `${s.last_seen_seconds_ago}s ago`
+                : 'never';
+            marker.setPopupContent(
+                `<b>${name}</b><br>IP: ${id}<br>Status: ${online ? 'Online' : 'Offline'} (last seen ${lastSeen})`
+            );
+        });
+    }
+
+    function applyStatusToHeader() {
+        const ids = Object.keys(siteMarkers);
+        const onlineCount = ids.filter(id => lastStatusData[id] && lastStatusData[id].online).length;
+        const badge = document.getElementById('vpn-status');
+        badge.textContent = `Sites: ${onlineCount}/${ids.length} Online`;
+        badge.className = 'status-badge' + (
+            onlineCount === ids.length ? '' : (onlineCount === 0 ? ' offline' : ' degraded')
+        );
+    }
+
+    function setTeleValue(id, text, cls) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.className = cls || '';
+    }
+
+    function updateTelemetryPanel() {
+        const target = document.getElementById('target-select').value;
+        const connBadge = document.getElementById('tele-conn-badge');
+        const note = document.getElementById('tele-note');
+
+        // Telemetry only makes sense for a single named site, not ALL/groups.
+        if (!lastStatusData[target]) {
+            connBadge.textContent = 'N/A';
+            connBadge.className = 'sub-status offline';
+            ['tele-conn','tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
+                .forEach(id => setTeleValue(id, '--'));
+            note.textContent = 'Select a single siren above to see its live RS232 status.';
+            return;
+        }
+
+        const s = lastStatusData[target];
+
+        connBadge.textContent = s.online ? 'ONLINE' : 'OFFLINE';
+        connBadge.className = 'sub-status ' + (s.online ? 'online' : 'offline');
+
+        const lastSeen = s.last_seen_seconds_ago !== null ? `${s.last_seen_seconds_ago}s ago` : 'never';
+        setTeleValue('tele-conn', s.online ? `Connected (${lastSeen})` : `Lost (last seen ${lastSeen})`,
+            s.online ? 'ok' : 'bad');
+
+        if (!s.online) {
+            // Client isn't reachable at all - don't show stale RS232 numbers as current.
+            ['tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
+                .forEach(id => setTeleValue(id, 'No data', 'warn'));
+            note.textContent = 'This site\'s client.py has not reported in - RS232 data below is unavailable.';
+            return;
+        }
+
+        if (!s.rs232_ok || !s.rs232 || Object.keys(s.rs232).length === 0) {
+            ['tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
+                .forEach(id => setTeleValue(id, 'No data', 'warn'));
+            note.textContent = s.rs232_error
+                ? `Client is online, but RS232 read failed: ${s.rs232_error}`
+                : 'Client is online, but no RS232 reading has come in yet.';
+            return;
+        }
+
+        const rs = s.rs232;
+        note.textContent = '';
+
+        setTeleValue('tele-active', rs['Active'] === '1' ? 'Yes' : 'No', rs['Active'] === '1' ? 'warn' : 'ok');
+        setTeleValue('tele-volts', rs['Batery'] || rs['Battery'] || '--');
+        setTeleValue('tele-vol', rs['Volume'] || '--');
+        setTeleValue('tele-power', rs['Power'] || '--', rs['Power'] === 'OFF' ? 'bad' : 'ok');
+        setTeleValue('tele-door', rs['Cabinet'] || '--', rs['Cabinet'] === 'OPEN' ? 'warn' : 'ok');
+
+        const test = rs['Test'];
+        if (test === 'ERROR') {
+            const badAmps = rs['BadAmplifiers'] || '0';
+            const badDrv = rs['BadDrivers'] || '0';
+            setTeleValue('tele-amp', badAmps !== '0' ? `FAULT (${badAmps})` : 'Ready', badAmps !== '0' ? 'bad' : 'ok');
+            setTeleValue('tele-driver', badDrv !== '0' ? `FAULT (${badDrv})` : 'OK', badDrv !== '0' ? 'bad' : 'ok');
+        } else if (test === 'OK') {
+            setTeleValue('tele-amp', 'Ready', 'ok');
+            setTeleValue('tele-driver', 'OK', 'ok');
+        } else {
+            setTeleValue('tele-amp', 'Not tested', 'warn');
+            setTeleValue('tele-driver', 'Not tested', 'warn');
+        }
+    }
+
+    document.getElementById('target-select').addEventListener('change', updateTelemetryPanel);
+
+    pollStatus();
+    setInterval(pollStatus, STATUS_POLL_MS);
 </script>
 </body>
 </html>
