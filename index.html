@@ -82,14 +82,14 @@
         /* Responsive Layout Engine */
         main { 
             display: flex; 
-            flex-direction: column; /* Mobile Default: Stacked Cards */
+            flex-direction: column; 
             flex: 1; 
             width: 100%;
         }
 
         #map-container {
             width: 100%;
-            height: 380px; /* Generous map height */
+            height: 380px; 
             position: relative;
             border-bottom: 2px solid var(--border-color);
         }
@@ -109,7 +109,6 @@
             gap: 16px;
         }
 
-        /* Mobile Card Styling */
         .card {
             background: var(--card-bg); 
             border-radius: 10px;
@@ -143,7 +142,7 @@
         .sub-status.online { background: #064e3b; color: var(--accent-green); }
         .sub-status.offline { background: #450a0a; color: var(--accent-red); }
 
-        select, button {
+        select, button, input {
             width: 100%; 
             padding: 14px; 
             border-radius: 8px;
@@ -155,9 +154,12 @@
             touch-action: manipulation;
         }
 
-        select { 
+        select, input[type="number"] { 
             background: #334155; 
             color: var(--text-main); 
+        }
+
+        select { 
             appearance: none;
             background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F8FAFC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
             background-repeat: no-repeat;
@@ -203,30 +205,30 @@
             margin-bottom: 0;
         }
 
-        /* Desktop View (Screens wider than 768px) -> Cards Horizontal at Top */
+        /* Desktop View: Horizontal Top Cards Layout */
         @media (min-width: 769px) {
             body {
-                overflow-y: auto; /* Allow full vertical scrolling */
+                overflow-y: auto;
             }
 
             main { 
-                flex-direction: column; /* Map on top, cards below in horizontal row */
+                flex-direction: column; 
             }
 
             #map-container {
-                height: 450px; /* Large map view */
+                height: 450px; 
             }
 
             #control-panel {
-                flex-direction: row; /* Horizontal layout for all cards */
+                flex-direction: row; 
                 flex-wrap: wrap;
                 gap: 16px;
                 justify-content: space-between;
             }
 
             .card {
-                flex: 1 1 calc(25% - 16px); /* 4 cards side-by-side horizontally */
-                min-width: 260px;
+                flex: 1 1 calc(30% - 16px); /* Horizontal cards layout supporting multiple cards */
+                min-width: 280px;
             }
         }
     </style>
@@ -257,7 +259,7 @@
                 <optgroup label="Individual Sirens">
                     <option value="100.121.138.94">Siren 01 - Mac Mini Site</option>
                     <option value="100.118.38.113">Siren 02 - Dell Optiplex</option>
-                    <option value="100.113.97.64">Siren 03 - Lenovo Laptop (Local Server)</option>
+                    <option value="100.113.97.64">Siren 03 - Lenovo Laptop (Server)</option>
                 </optgroup>
             </select>
         </div>
@@ -282,6 +284,23 @@
             </p>
             <button id="start-btn" class="btn-talk" onclick="startLivePA()">🎙 START BROADCAST</button>
             <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
+        </div>
+
+        <!-- Time-Based Alarms Card (NEW) -->
+        <div class="card">
+            <h3>5. Time-Based Alarms</h3>
+            <select id="timer-tone-select">
+                <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
+                <option value="TEST">System Test Tone (MMC Track 2)</option>
+                <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
+            </select>
+            <div style="margin-bottom: 10px;">
+                <label style="font-size: 0.75rem; color: var(--text-sub); display: block; margin-bottom: 4px;">Duration (Minutes):</label>
+                <input type="number" id="alarm-duration" value="5" min="1" max="120">
+            </div>
+            <button class="btn-tone" onclick="startTimedAlarm()">⏰ Start Timed Alarm</button>
+            <button class="btn-stop" onclick="cancelTimedAlarm()">⏱ Cancel Timer</button>
+            <p class="telemetry-note" id="timer-status">Status: Idle</p>
         </div>
 
         <!-- Local Siren Telemetry Card -->
@@ -309,7 +328,7 @@
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // 1. Initialize Map with Box Zoom Enabled for Area Dragging
+    // 1. Initialize Map with Box Zoom Enabled
     const map = L.map('map', { boxZoom: true }).setView([14.7500, 120.9500], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
@@ -322,7 +341,6 @@
         { id: "100.113.97.64", name: "Siren 03 - Lenovo Laptop (Server)", lat: 14.77495, lng: 120.95797 }
     ];
 
-    // Automatically set zoom & bounds dependent on marker dot placements
     const markerGroup = new L.featureGroup();
     const siteMarkers = {};
 
@@ -335,7 +353,6 @@
         
         marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}<br>Status: checking...`);
         
-        // Single click selects the dot as the target and updates telemetry
         marker.on('click', () => {
             const selectEl = document.getElementById('target-select');
             selectEl.value = s.id;
@@ -346,12 +363,11 @@
         markerGroup.addLayer(marker);
     });
 
-    // Fit map view automatically to encompass all siren dots
     if (sirens.length > 0) {
         map.fitBounds(markerGroup.getBounds().pad(0.2));
     }
 
-    // Handle box zoom / drag selection across multiple markers on the map
+    // Box zoom / drag selection (Hold Shift + Drag)
     map.on('boxzoomend', function(e) {
         const bounds = e.boxZoomBounds;
         const selectedIds = [];
@@ -364,23 +380,26 @@
         });
 
         const selectEl = document.getElementById('target-select');
+
         if (selectedIds.length === 1) {
             selectEl.value = selectedIds[0];
         } else if (selectedIds.length === 2) {
-            // If any two selected, temporarily set target to the first or handle group if supported; 
-            // set dropdown to the first selected or create dynamic custom behavior
-            selectEl.value = selectedIds[0]; // Or handle multi-target logic
-            alert(`Selected 2 stations: ${selectedIds.join(', ')}`);
+            selectEl.value = selectedIds[0];
+            alert(`Selected 2 stations: ${selectedIds.join(', ')} (Target set to first selected)`);
         } else if (selectedIds.length >= 3) {
             selectEl.value = "ALL";
-            alert("All 3 stations selected - Target set to BROADCAST ALL SIRENS");
+            alert("All stations selected - Target set to BROADCAST ALL SIRENS");
+        } else {
+            return;
         }
+
+        selectEl.dispatchEvent(new Event('change'));
         updateTelemetryPanel();
     });
 
     setTimeout(() => { map.invalidateSize(); }, 500);
 
-    // 3. Execution Logic
+    // 3. Execution Logic & Timed Alarm Functions
     const BACKEND_URL = "http://100.113.97.64:8080"; 
 
     function sendToneCommand() {
@@ -400,6 +419,54 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'STOP', target: target })
         }).then(r => alert(`Stopped Alarms on ${target}`));
+    }
+
+    // Time-Based Alarm States & Logic
+    let alarmTimer = null;
+    let alarmCountdownInterval = null;
+
+    function startTimedAlarm() {
+        const target = document.getElementById('target-select').value;
+        const tone = document.getElementById('timer-tone-select').value;
+        const minutes = parseInt(document.getElementById('alarm-duration').value) || 5;
+
+        fetch(`${BACKEND_URL}/api/trigger`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'PLAY', target: target, tone: tone })
+        }).then(r => {
+            alert(`Timed alarm (${tone}) started for ${minutes} minute(s) on target: ${target}`);
+        });
+
+        let timeRemaining = minutes * 60;
+        const statusEl = document.getElementById('timer-status');
+
+        if (alarmTimer) clearTimeout(alarmTimer);
+        if (alarmCountdownInterval) clearInterval(alarmCountdownInterval);
+
+        alarmCountdownInterval = setInterval(() => {
+            if (timeRemaining <= 0) {
+                clearInterval(alarmCountdownInterval);
+                cancelTimedAlarm();
+                return;
+            }
+            const mins = Math.floor(timeRemaining / 60);
+            const secs = timeRemaining % 60;
+            statusEl.textContent = `Status: Playing... (${mins}m ${secs}s remaining)`;
+            timeRemaining--;
+        }, 1000);
+
+        alarmTimer = setTimeout(() => {
+            sendStopCommand();
+            statusEl.textContent = 'Status: Time expired (Alarm stopped)';
+        }, minutes * 60 * 1000);
+    }
+
+    function cancelTimedAlarm() {
+        if (alarmTimer) clearTimeout(alarmTimer);
+        if (alarmCountdownInterval) clearInterval(alarmCountdownInterval);
+        document.getElementById('timer-status').textContent = 'Status: Stopped / Idle';
+        sendStopCommand();
     }
 
     let micStream;
