@@ -144,7 +144,7 @@
 
         select, button, input {
             width: 100%; 
-            padding: 14px; 
+            padding: 12px; 
             border-radius: 8px;
             border: none; 
             font-size: 0.95rem;
@@ -154,7 +154,7 @@
             touch-action: manipulation;
         }
 
-        select, input[type="number"] { 
+        select, input[type="number"], input[type="time"] { 
             background: #334155; 
             color: var(--text-main); 
         }
@@ -171,6 +171,105 @@
         .btn-stop { background: var(--accent-red); color: white; }
         .btn-talk { background: var(--accent-green); color: white; }
         .btn-talk:active { background: #059669; transform: scale(0.98); }
+        .btn-add { background: #10b981; color: white; }
+
+        /* Alarm List Styling */
+        .alarm-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .alarm-item {
+            background: #1e293b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alarm-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .alarm-time {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        .alarm-desc {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+        }
+
+        .alarm-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #475569;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-green);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: var(--accent-red);
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 4px;
+            width: auto;
+            margin: 0;
+        }
 
         .telemetry-grid { 
             display: grid; 
@@ -227,7 +326,7 @@
             }
 
             .card {
-                flex: 1 1 calc(30% - 16px); /* Horizontal cards layout supporting multiple cards */
+                flex: 1 1 calc(30% - 16px); 
                 min-width: 280px;
             }
         }
@@ -286,21 +385,33 @@
             <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
         </div>
 
-        <!-- Time-Based Alarms Card (NEW) -->
+        <!-- Time-Based Alarms Card (NEW ALARM CLOCK STYLE) -->
         <div class="card">
             <h3>5. Time-Based Alarms</h3>
-            <select id="timer-tone-select">
+            <select id="alarm-tone">
                 <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
                 <option value="TEST">System Test Tone (MMC Track 2)</option>
                 <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
             </select>
-            <div style="margin-bottom: 10px;">
-                <label style="font-size: 0.75rem; color: var(--text-sub); display: block; margin-bottom: 4px;">Duration (Minutes):</label>
-                <input type="number" id="alarm-duration" value="5" min="1" max="120">
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.70rem; color: var(--text-sub); display: block; margin-bottom: 2px;">ALARM TIME (HH:MM)</label>
+                    <input type="time" id="alarm-time-input" required>
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 0.70rem; color: var(--text-sub); display: block; margin-bottom: 2px;">DURATION (MIN)</label>
+                    <input type="number" id="alarm-duration" value="5" min="1" max="120">
+                </div>
             </div>
-            <button class="btn-tone" onclick="startTimedAlarm()">⏰ Start Timed Alarm</button>
-            <button class="btn-stop" onclick="cancelTimedAlarm()">⏱ Cancel Timer</button>
-            <p class="telemetry-note" id="timer-status">Status: Idle</p>
+
+            <button class="btn-add" onclick="addNewAlarm()">➕ Add Timed Alarm</button>
+
+            <!-- Alarm List Container -->
+            <div class="alarm-list" id="alarm-list-container">
+                <!-- Dynamic Alarms Will Render Here -->
+            </div>
+            <p class="telemetry-note" id="clock-display" style="margin-top: 8px; text-align: center;">Current System Time: --:--:--</p>
         </div>
 
         <!-- Local Siren Telemetry Card -->
@@ -399,7 +510,7 @@
 
     setTimeout(() => { map.invalidateSize(); }, 500);
 
-    // 3. Execution Logic & Timed Alarm Functions
+    // 3. Execution Logic & Timed Alarms Scheduler Engine
     const BACKEND_URL = "http://100.113.97.64:8080"; 
 
     function sendToneCommand() {
@@ -421,53 +532,127 @@
         }).then(r => alert(`Stopped Alarms on ${target}`));
     }
 
-    // Time-Based Alarm States & Logic
-    let alarmTimer = null;
-    let alarmCountdownInterval = null;
+    // Alarm Clock State & List Management
+    let alarmList = [];
 
-    function startTimedAlarm() {
-        const target = document.getElementById('target-select').value;
-        const tone = document.getElementById('timer-tone-select').value;
-        const minutes = parseInt(document.getElementById('alarm-duration').value) || 5;
+    function addNewAlarm() {
+        const timeVal = document.getElementById('alarm-time-input').value;
+        const toneVal = document.getElementById('alarm-tone').value;
+        const toneText = document.getElementById('alarm-tone').selectedOptions[0].text;
+        const durationVal = parseInt(document.getElementById('alarm-duration').value) || 5;
+        const targetVal = document.getElementById('target-select').value;
 
-        fetch(`${BACKEND_URL}/api/trigger`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'PLAY', target: target, tone: tone })
-        }).then(r => {
-            alert(`Timed alarm (${tone}) started for ${minutes} minute(s) on target: ${target}`);
+        if (!timeVal) {
+            alert("Please select a valid alarm time (HH:MM).");
+            return;
+        }
+
+        const newAlarm = {
+            id: Date.now(),
+            time: timeVal, // "HH:MM"
+            tone: toneVal,
+            toneName: toneText,
+            duration: durationVal,
+            target: targetVal,
+            enabled: true,
+            triggeredToday: false
+        };
+
+        alarmList.push(newAlarm);
+        renderAlarmList();
+    }
+
+    function toggleAlarm(id) {
+        const alarm = alarmList.find(a => a.id === id);
+        if (alarm) {
+            alarm.enabled = !alarm.enabled;
+            alarm.triggeredToday = false; // Reset trigger state on toggle
+            renderAlarmList();
+        }
+    }
+
+    function deleteAlarm(id) {
+        alarmList = alarmList.filter(a => a.id !== id);
+        renderAlarmList();
+    }
+
+    function renderAlarmList() {
+        const container = document.getElementById('alarm-list-container');
+        if (alarmList.length === 0) {
+            container.innerHTML = `<p style="text-align: center; color: var(--text-sub); font-size: 0.8rem; margin: 10px 0;">No active alarms scheduled.</p>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        alarmList.forEach(alarm => {
+            const div = document.createElement('div');
+            div.className = 'alarm-item';
+            div.innerHTML = `
+                <div class="alarm-info">
+                    <span class="alarm-time">${alarm.time}</span>
+                    <span class="alarm-desc">${alarm.toneName} (${alarm.duration} min) [Target: ${alarm.target}]</span>
+                </div>
+                <div class="alarm-controls">
+                    <label class="switch">
+                        <input type="checkbox" ${alarm.enabled ? 'checked' : ''} onchange="toggleAlarm(${alarm.id})">
+                        <span class="slider"></span>
+                    </label>
+                    <button class="btn-delete" onclick="deleteAlarm(${alarm.id})">✕</button>
+                </div>
+            `;
+            container.appendChild(div);
         });
+    }
 
-        let timeRemaining = minutes * 60;
-        const statusEl = document.getElementById('timer-status');
+    // Background Clock & Alarm Trigger Checker Loop (Runs every second)
+    setInterval(() => {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const currentTimeStr = `${hours}:${minutes}`;
 
-        if (alarmTimer) clearTimeout(alarmTimer);
-        if (alarmCountdownInterval) clearInterval(alarmCountdownInterval);
+        document.getElementById('clock-display').textContent = `Current System Time: ${hours}:${minutes}:${seconds}`;
 
-        alarmCountdownInterval = setInterval(() => {
-            if (timeRemaining <= 0) {
-                clearInterval(alarmCountdownInterval);
-                cancelTimedAlarm();
-                return;
+        // Reset trigger flag if minute changes
+        if (seconds === "00") {
+            alarmList.forEach(alarm => {
+                if (alarm.time !== currentTimeStr) {
+                    alarm.triggeredToday = false;
+                }
+            });
+        }
+
+        // Check active alarms
+        alarmList.forEach(alarm => {
+            if (alarm.enabled && !alarm.triggeredToday && alarm.time === currentTimeStr) {
+                alarm.triggeredToday = true;
+                
+                // Trigger Alarm PLAY command
+                fetch(`${BACKEND_URL}/api/trigger`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'PLAY', target: alarm.target, tone: alarm.tone })
+                }).then(() => {
+                    console.log(`[ALARM TRIGGERED] ${alarm.tone} on target ${alarm.target} for ${alarm.duration} mins`);
+                });
+
+                // Set timer to stop alarm after configured duration
+                setTimeout(() => {
+                    fetch(`${BACKEND_URL}/api/trigger`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'STOP', target: alarm.target })
+                    }).then(() => {
+                        console.log(`[ALARM STOPPED] Timed alarm completed for target ${alarm.target}`);
+                    });
+                }, alarm.duration * 60 * 1000);
             }
-            const mins = Math.floor(timeRemaining / 60);
-            const secs = timeRemaining % 60;
-            statusEl.textContent = `Status: Playing... (${mins}m ${secs}s remaining)`;
-            timeRemaining--;
-        }, 1000);
+        });
+    }, 1000);
 
-        alarmTimer = setTimeout(() => {
-            sendStopCommand();
-            statusEl.textContent = 'Status: Time expired (Alarm stopped)';
-        }, minutes * 60 * 1000);
-    }
-
-    function cancelTimedAlarm() {
-        if (alarmTimer) clearTimeout(alarmTimer);
-        if (alarmCountdownInterval) clearInterval(alarmCountdownInterval);
-        document.getElementById('timer-status').textContent = 'Status: Stopped / Idle';
-        sendStopCommand();
-    }
+    // Initial render call
+    renderAlarmList();
 
     let micStream;
     let audioCtx;
