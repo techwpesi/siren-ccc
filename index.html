@@ -1,889 +1,655 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Siren Central Command & Control (CCC)</title>
-    <!-- Leaflet.js CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        :root {
-            --bg-dark: #0f172a;
-            --panel-bg: #1e293b;
-            --card-bg: #0f172a;
-            --accent-blue: #3b82f6;
-            --accent-green: #10b981;
-            --accent-red: #ef4444;
-            --accent-amber: #f59e0b;
-            --text-main: #f8fafc;
-            --text-sub: #94a3b8;
-            --border-color: #334155;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0; 
-            padding: 0;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex; 
-            flex-direction: column; 
-            min-height: 100vh;
-        }
-
-        header {
-            background-color: var(--panel-bg);
-            padding: 12px 20px; 
-            display: flex;
-            justify-content: space-between; 
-            align-items: center;
-            border-bottom: 2px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        header h2 {
-            margin: 0;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-badge {
-            background: #064e3b; 
-            color: var(--accent-green);
-            padding: 6px 12px; 
-            border-radius: 20px;
-            font-size: 0.8rem; 
-            font-weight: bold; 
-            border: 1px solid var(--accent-green);
-            white-space: nowrap;
-            transition: background 0.3s, color 0.3s, border-color 0.3s;
-        }
-
-        .status-badge.degraded {
-            background: #451a03;
-            color: var(--accent-amber);
-            border-color: var(--accent-amber);
-        }
-
-        .status-badge.offline {
-            background: #450a0a;
-            color: var(--accent-red);
-            border-color: var(--accent-red);
-        }
-
-        /* Responsive Layout Engine */
-        main { 
-            display: flex; 
-            flex-direction: column; 
-            flex: 1; 
-            width: 100%;
-        }
-
-        #map-container {
-            width: 100%;
-            height: 380px; 
-            position: relative;
-            border-bottom: 2px solid var(--border-color);
-        }
-
-        #map { 
-            width: 100%; 
-            height: 100%; 
-            background: #000; 
-        }
-
-        #control-panel {
-            width: 100%;
-            background-color: var(--panel-bg);
-            padding: 16px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 16px;
-        }
-
-        .card {
-            background: var(--card-bg); 
-            border-radius: 10px;
-            padding: 16px; 
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
-
-        .card h3 { 
-            margin-top: 0; 
-            margin-bottom: 12px; 
-            color: var(--accent-blue); 
-            font-size: 0.95rem; 
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-        }
-
-        .card h3 .sub-status {
-            text-transform: none;
-            letter-spacing: normal;
-            font-size: 0.75rem;
-            font-weight: bold;
-            padding: 3px 8px;
-            border-radius: 12px;
-        }
-
-        .sub-status.online { background: #064e3b; color: var(--accent-green); }
-        .sub-status.offline { background: #450a0a; color: var(--accent-red); }
-
-        select, button, input {
-            width: 100%; 
-            padding: 12px; 
-            border-radius: 8px;
-            border: none; 
-            font-size: 0.95rem;
-            font-weight: bold; 
-            cursor: pointer; 
-            margin-bottom: 10px;
-            touch-action: manipulation;
-        }
-
-        select, input[type="number"], input[type="time"] { 
-            background: #334155; 
-            color: var(--text-main); 
-        }
-
-        select { 
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23F8FAFC%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 14px top 50%;
-            background-size: 12px auto;
-        }
-
-        .btn-tone { background: var(--accent-blue); color: white; }
-        .btn-stop { background: var(--accent-red); color: white; }
-        .btn-talk { background: var(--accent-green); color: white; }
-        .btn-talk:active { background: #059669; transform: scale(0.98); }
-        .btn-add { background: #10b981; color: white; }
-
-        /* Alarm List Styling */
-        .alarm-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 220px;
-            overflow-y: auto;
-            margin-top: 10px;
-        }
-
-        .alarm-item {
-            background: #1e293b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .alarm-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .alarm-time {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--text-main);
-        }
-
-        .alarm-desc {
-            font-size: 0.75rem;
-            color: var(--text-sub);
-        }
-
-        .alarm-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        /* Toggle Switch */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 48px;
-            height: 24px;
-        }
-
-        .switch input { 
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #475569;
-            transition: .3s;
-            border-radius: 24px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--accent-green);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(24px);
-        }
-
-        .btn-delete {
-            background: none;
-            border: none;
-            color: var(--accent-red);
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.85rem;
-            padding: 4px;
-            width: auto;
-            margin: 0;
-        }
-
-        .telemetry-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 10px; 
-            font-size: 0.85rem; 
-        }
-
-        .telemetry-item { 
-            background: #1e293b; 
-            padding: 10px; 
-            border-radius: 6px; 
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .telemetry-item span {
-            color: var(--text-sub);
-            font-size: 0.75rem;
-        }
-
-        .telemetry-item b.ok { color: var(--accent-green); }
-        .telemetry-item b.warn { color: var(--accent-amber); }
-        .telemetry-item b.bad { color: var(--accent-red); }
-
-        .telemetry-note {
-            font-size: 0.75rem;
-            color: var(--text-sub);
-            margin-top: 10px;
-            margin-bottom: 0;
-        }
-
-        /* Desktop View: Horizontal Top Cards Layout */
-        @media (min-width: 769px) {
-            body {
-                overflow-y: auto;
-            }
-
-            main { 
-                flex-direction: column; 
-            }
-
-            #map-container {
-                height: 450px; 
-            }
-
-            #control-panel {
-                flex-direction: row; 
-                flex-wrap: wrap;
-                gap: 16px;
-                justify-content: space-between;
-            }
-
-            .card {
-                flex: 1 1 calc(30% - 16px); 
-                min-width: 280px;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Siren Central Command & Control (CCC)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+<style>
+:root{--bg:#0f172a;--panel:#1e293b;--card:#0f172a;--blue:#3b82f6;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--text:#f8fafc;--sub:#94a3b8;--border:#334155}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+header{background:var(--panel);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1000}
+header h2{margin:0;font-size:1.15rem}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.status-badge{background:#064e3b;color:var(--green);padding:6px 12px;border-radius:20px;font-size:.8rem;font-weight:bold;border:1px solid var(--green);white-space:nowrap}
+.status-badge.degraded{background:#451a03;color:var(--amber);border-color:var(--amber)}
+.status-badge.offline{background:#450a0a;color:var(--red);border-color:var(--red)}
+.chip{font-size:.78rem;color:var(--sub);white-space:nowrap}
+button,select,input,textarea{font:inherit}
+.btn{border:none;border-radius:8px;padding:12px;font-weight:bold;font-size:.92rem;cursor:pointer;width:100%;margin-bottom:8px;color:#fff;touch-action:manipulation}
+.btn.sm{width:auto;padding:6px 10px;font-size:.78rem;margin:0}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-blue{background:var(--blue)}.btn-red{background:var(--red)}.btn-green{background:var(--green)}.btn-grey{background:#475569}.btn-amber{background:#b45309}
+#arm-btn{width:auto;margin:0;padding:8px 14px;border-radius:20px;background:#475569}
+#arm-btn.armed{background:var(--red);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.65}}
+select,input[type=text],input[type=password],input[type=number],input[type=time],input[type=date],textarea{width:100%;padding:11px;border-radius:8px;border:1px solid var(--border);background:#334155;color:var(--text);margin-bottom:8px;font-size:.92rem}
+textarea{resize:vertical;min-height:70px;font-weight:normal}
+label.l{display:block;font-size:.72rem;color:var(--sub);margin-bottom:3px}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+#alert-bar{position:sticky;top:52px;z-index:999}
+.abar{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:.85rem;border-bottom:1px solid #000}
+.abar .msg{flex:1}.abar.critical{background:#7f1d1d}.abar.warning{background:#78350f}.abar.pending{background:#1e3a8a}
+.abar.critical:not(.cleared){animation:blink 1.2s infinite}.abar.cleared{opacity:.6}
+#map-container{height:420px;border-bottom:2px solid var(--border)}#map{width:100%;height:100%;background:#000}
+.pulse{animation:blink .8s infinite}
+#control-panel{background:var(--panel);padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.card{background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border);box-shadow:0 4px 6px -1px rgba(0,0,0,.3);min-width:0}
+.card.wide{grid-column:1/-1}
+.card h3{margin:0 0 12px;color:var(--blue);font-size:.92rem;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sub-status{text-transform:none;letter-spacing:normal;font-size:.75rem;font-weight:bold;padding:3px 8px;border-radius:12px}
+.sub-status.online{background:#064e3b;color:var(--green)}.sub-status.offline{background:#450a0a;color:var(--red)}
+.note{font-size:.75rem;color:var(--sub);margin:6px 0 0}
+.tele-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;font-size:.85rem}
+.tele-item{background:var(--panel);padding:8px 10px;border-radius:6px;border:1px solid var(--border);display:flex;flex-direction:column;gap:3px}
+.tele-item span{color:var(--sub);font-size:.72rem}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px}
+.chart-box{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px;height:210px;position:relative}
+.vu{height:18px;background:#1e293b;border:1px solid var(--border);border-radius:9px;position:relative;overflow:hidden;margin-bottom:6px}
+#vu-fill{height:100%;width:0;background:linear-gradient(90deg,var(--green) 0 70%,var(--amber) 70% 90%,var(--red) 90%);background-size:100vw 100%;transition:width .05s}
+#vu-peak{position:absolute;top:0;bottom:0;width:2px;background:#fff;left:0}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--sub);font-weight:600}
+.scroll{max-height:300px;overflow:auto}
+.tag{padding:1px 7px;border-radius:10px;font-size:.7rem;background:#334155}
+.tag.trigger{background:#1e3a8a}.tag.alert{background:#7f1d1d}.tag.login,.tag.arm{background:#365314}
+code{background:#334155;padding:1px 5px;border-radius:4px}
+/* login */
+#login{position:fixed;inset:0;background:rgba(2,6,23,.96);z-index:5000;display:flex;align-items:center;justify-content:center}
+#login .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px;width:min(360px,92vw)}
+#login h2{margin:0 0 4px}#login .err{color:var(--red);min-height:1.2em;font-size:.82rem;margin:2px 0 8px}
+#toasts{position:fixed;bottom:16px;right:16px;z-index:6000;display:flex;flex-direction:column;gap:8px;max-width:min(420px,90vw)}
+.toast{background:#334155;padding:10px 14px;border-radius:8px;border-left:4px solid var(--blue);font-size:.85rem;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.toast.err{border-color:var(--red)}.toast.ok{border-color:var(--green)}.toast.warn{border-color:var(--amber)}
+body[data-role="viewer"] .op-only{display:none!important}
+body:not([data-role="admin"]) .admin-only{display:none!important}
+.hidden{display:none!important}
+</style>
 </head>
-<body>
+<body data-role="viewer">
+
+<div id="login">
+  <div class="box">
+    <h2>🚨 Siren Central Command</h2>
+    <p class="note" style="margin-bottom:14px">Authorized personnel only. Actions are logged.</p>
+    <label class="l">Username</label><input type="text" id="lg-user" autocomplete="username">
+    <label class="l">Password</label><input type="password" id="lg-pass" autocomplete="current-password">
+    <div class="err" id="lg-err"></div>
+    <button class="btn btn-blue" id="lg-btn">Sign in</button>
+  </div>
+</div>
 
 <header>
-    <h2>🚨 Siren Central Command</h2>
+  <h2>🚨 Siren Central Command</h2>
+  <div class="hdr-right">
+    <span class="chip" id="clock"></span>
+    <button class="btn op-only" id="arm-btn">🔒 SAFE — click to ARM</button>
+    <button class="btn btn-grey sm" id="mute-btn" title="Alert sound / desktop notifications">🔔</button>
+    <span class="chip" id="whoami"></span>
+    <button class="btn btn-grey sm" id="logout-btn">Logout</button>
     <div id="vpn-status" class="status-badge">Checking sites...</div>
+  </div>
 </header>
+<div id="alert-bar"></div>
 
 <main>
-    <div id="map-container">
-        <div id="map"></div>
+<div id="map-container"><div id="map"></div></div>
+<div id="control-panel">
+
+  <div class="card">
+    <h3>1. Select Target</h3>
+    <select id="target-select"></select>
+    <p class="note">Draw a polygon / rectangle / circle on the map (toolbar, top-left) to target every siren inside it. Click a marker to select that siren.</p>
+    <p class="note" id="target-info"></p>
+  </div>
+
+  <div class="card op-only">
+    <h3>2. Pre-Recorded Tones</h3>
+    <select id="tone-select">
+      <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
+      <option value="TEST">System Test Tone (MMC Track 2)</option>
+      <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
+    </select>
+    <button class="btn btn-blue needs-arm" id="play-btn">🔊 Play Selected Tone</button>
+    <button class="btn btn-red" id="stop-btn">⏹ STOP ALL ALARMS</button>
+    <p class="note">STOP always works, even when the system is not armed.</p>
+  </div>
+
+  <div class="card op-only">
+    <h3>3. Live Public Announcement</h3>
+    <label class="l">Microphone level (test before you broadcast)</label>
+    <div class="vu"><div id="vu-fill"></div><div id="vu-peak"></div></div>
+    <div class="row" style="margin-bottom:8px"><span class="note" id="vu-db" style="margin:0">Mic off</span><span class="note bad" id="vu-clip" style="margin:0;text-align:right"></span></div>
+    <button class="btn btn-grey" id="mic-test-btn">🎚 Test Microphone</button>
+    <button class="btn btn-green needs-arm" id="pa-start-btn">🎙 START BROADCAST</button>
+    <button class="btn btn-red" id="pa-stop-btn">⏹ STOP BROADCAST</button>
+    <div id="pa-latency" class="note"></div>
+  </div>
+
+  <div class="card op-only">
+    <h3>3b. Voice Announcement (TTS)</h3>
+    <label class="l">Template</label>
+    <select id="tts-template"></select>
+    <textarea id="tts-text" maxlength="500" placeholder="Type the announcement..."></textarea>
+    <div class="row">
+      <div><label class="l">Repeat</label><select id="tts-repeat"><option>1</option><option>2</option><option>3</option></select></div>
+      <div><label class="l">&nbsp;</label><button class="btn btn-grey" id="tts-preview" style="margin:0">▶ Preview (this PC)</button></div>
     </div>
-    
-    <div id="control-panel">
-        
-        <!-- Target Selection Card -->
-        <div class="card">
-            <h3>1. Select Target</h3>
-            <select id="target-select">
-                <option value="ALL">📢 BROADCAST ALL SIRENS</option>
-                <optgroup label="Groups">
-                    <option value="GROUP_NORTH">North Sector</option>
-                    <option value="GROUP_COASTAL">Coastal Sector</option>
-                </optgroup>
-                <optgroup label="Individual Sirens">
-                    <option value="100.121.138.94">Siren 01 - Mac Mini Site</option>
-                    <option value="100.118.38.113">Siren 02 - Dell Optiplex</option>
-                    <option value="100.113.97.64">Siren 03 - Lenovo Laptop (Server)</option>
-                </optgroup>
-            </select>
-        </div>
+    <button class="btn btn-green needs-arm" id="tts-send" style="margin-top:8px">📣 Broadcast via Sirens</button>
+    <p class="note" id="tts-note">Preview uses your browser's voice. Broadcast renders speech on the server.</p>
+  </div>
 
-        <!-- Pre-Recorded Tone Controls Card -->
-        <div class="card">
-            <h3>2. Pre-Recorded Tone Controls</h3>
-            <select id="tone-select">
-                <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
-                <option value="TEST">System Test Tone (MMC Track 2)</option>
-                <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
-            </select>
-            <button class="btn-tone" onclick="sendToneCommand()">🔊 Play Selected Tone</button>
-            <button class="btn-stop" onclick="sendStopCommand()">⏹ STOP ALL ALARMS</button>
-        </div>
-
-        <!-- Live PA Stream Card -->
-        <div class="card">
-            <h3>3. Live Public Announcement</h3>
-            <p style="font-size: 0.8rem; color: var(--text-sub); margin-top: 0; margin-bottom: 12px;">
-                Stream live microphone audio across selected sirens over Tailscale.
-            </p>
-            <button id="start-btn" class="btn-talk" onclick="startLivePA()">🎙 START BROADCAST</button>
-            <button id="stop-btn" class="btn-stop" onclick="stopLivePA()">⏹ STOP BROADCAST</button>
-        </div>
-
-        <!-- Time-Based Alarms Card (NEW ALARM CLOCK STYLE) -->
-        <div class="card">
-            <h3>5. Time-Based Alarms</h3>
-            <select id="alarm-tone">
-                <option value="EVACUATE">Evacuation Warning (MMC Track 1)</option>
-                <option value="TEST">System Test Tone (MMC Track 2)</option>
-                <option value="ALL_CLEAR">All Clear Signal (MMC Track 3)</option>
-            </select>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <div style="flex: 1;">
-                    <label style="font-size: 0.70rem; color: var(--text-sub); display: block; margin-bottom: 2px;">ALARM TIME (HH:MM)</label>
-                    <input type="time" id="alarm-time-input" required>
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 0.70rem; color: var(--text-sub); display: block; margin-bottom: 2px;">DURATION (MIN)</label>
-                    <input type="number" id="alarm-duration" value="5" min="1" max="120">
-                </div>
-            </div>
-
-            <button class="btn-add" onclick="addNewAlarm()">➕ Add Timed Alarm</button>
-
-            <!-- Alarm List Container -->
-            <div class="alarm-list" id="alarm-list-container">
-                <!-- Dynamic Alarms Will Render Here -->
-            </div>
-            <p class="telemetry-note" id="clock-display" style="margin-top: 8px; text-align: center;">Current System Time: --:--:--</p>
-        </div>
-
-        <!-- Local Siren Telemetry Card -->
-        <div class="card">
-            <h3>
-                <span>4. Site Telemetry (RS232)</span>
-                <span id="tele-conn-badge" class="sub-status offline">OFFLINE</span>
-            </h3>
-            <div class="telemetry-grid">
-                <div class="telemetry-item"><span>Client Connection</span><b id="tele-conn">--</b></div>
-                <div class="telemetry-item"><span>Siren Active</span><b id="tele-active">--</b></div>
-                <div class="telemetry-item"><span>Battery</span><b id="tele-volts">--</b></div>
-                <div class="telemetry-item"><span>Amp Status</span><b id="tele-amp">--</b></div>
-                <div class="telemetry-item"><span>Driver Status</span><b id="tele-driver">--</b></div>
-                <div class="telemetry-item"><span>Door Sensor</span><b id="tele-door">--</b></div>
-                <div class="telemetry-item"><span>Power Supply</span><b id="tele-power">--</b></div>
-                <div class="telemetry-item"><span>Volume</span><b id="tele-vol">--</b></div>
-            </div>
-            <p class="telemetry-note" id="tele-note">Select a single siren above to see its live RS232 status.</p>
-        </div>
-
+  <div class="card wide">
+    <h3><span>4. Site Telemetry (RS232)</span><span id="tele-badge" class="sub-status offline">N/A</span></h3>
+    <div class="tele-grid">
+      <div class="tele-item"><span>Client Connection</span><b id="t-conn">--</b></div>
+      <div class="tele-item"><span>Siren Active</span><b id="t-active">--</b></div>
+      <div class="tele-item"><span>Battery</span><b id="t-bat">--</b></div>
+      <div class="tele-item"><span>Charger</span><b id="t-chg">--</b></div>
+      <div class="tele-item"><span>Enclosure Temp</span><b id="t-temp">--</b></div>
+      <div class="tele-item"><span>Power Supply</span><b id="t-pwr">--</b></div>
+      <div class="tele-item"><span>Door Sensor</span><b id="t-door">--</b></div>
+      <div class="tele-item"><span>Amp Status</span><b id="t-amp">--</b></div>
+      <div class="tele-item"><span>Driver Status</span><b id="t-drv">--</b></div>
+      <div class="tele-item"><span>Last Self-Test</span><b id="t-test">--</b></div>
+      <div class="tele-item"><span>Volume</span><b id="t-vol">--</b></div>
     </div>
+    <p class="note" id="tele-note">Select a single siren above to see its live RS232 status.</p>
+    <div class="row op-only" style="margin-top:10px;align-items:center">
+      <button class="btn btn-amber" id="selftest-btn" style="margin:0">🩺 Run Self-Test (selected target)</button>
+      <span class="note" id="selftest-note" style="margin:0"></span>
+    </div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <label class="l" style="margin:0;flex:0 0 auto">History:</label>
+      <select id="hist-range" style="margin:0;max-width:140px"><option value="6">6 hours</option><option value="24" selected>24 hours</option><option value="168">7 days</option></select>
+    </div>
+    <div class="charts">
+      <div class="chart-box"><canvas id="chart-bat"></canvas></div>
+      <div class="chart-box"><canvas id="chart-temp"></canvas></div>
+    </div>
+    <p class="note" id="chart-note"></p>
+  </div>
+
+  <div class="card wide">
+    <h3>5. Time-Based Alarms</h3>
+    <div class="op-only">
+      <div class="row">
+        <div><label class="l">Run now - tone</label><select id="timer-tone"></select></div>
+        <div><label class="l">Duration (min)</label><input type="number" id="timer-min" value="5" min="1" max="240"></div>
+      </div>
+      <button class="btn btn-blue needs-arm" id="timer-start">⏰ Start Timed Alarm (server stops it)</button>
+    </div>
+    <div id="timers-list" class="note"></div>
+
+    <h3 style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">Recurring & one-off schedules</h3>
+    <div class="admin-only">
+      <div class="row"><div><label class="l">Name</label><input type="text" id="sc-name" placeholder="Daily noon test"></div>
+        <div><label class="l">Tone</label><select id="sc-tone"></select></div></div>
+      <div class="row">
+        <div><label class="l">Repeat</label><select id="sc-type"><option value="daily">Every day</option><option value="weekdays">Weekdays (Mon-Fri)</option><option value="weekly">Weekly</option><option value="once">Once</option><option value="cron">Custom cron</option></select></div>
+        <div><label class="l">Time (server clock)</label><input type="time" id="sc-time" value="12:00"></div>
+        <div id="sc-date-w" class="hidden"><label class="l">Date</label><input type="date" id="sc-date"></div>
+        <div id="sc-dow-w" class="hidden"><label class="l">Day</label><select id="sc-dow"><option value="1">Mon</option><option value="2">Tue</option><option value="3">Wed</option><option value="4">Thu</option><option value="5">Fri</option><option value="6">Sat</option><option value="0">Sun</option></select></div>
+        <div id="sc-cron-w" class="hidden"><label class="l">Cron (m h dom mon dow)</label><input type="text" id="sc-cron" placeholder="0 12 * * 1-5"></div>
+        <div><label class="l">Duration (min)</label><input type="number" id="sc-dur" value="1" min="1" max="240"></div>
+      </div>
+      <button class="btn btn-green" id="sc-add">➕ Add Schedule (uses target above)</button>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Name</th><th>When</th><th>Target</th><th>Tone</th><th>Next run</th><th>Last</th><th class="admin-only"></th></tr></thead><tbody id="sc-body"></tbody></table></div>
+    <p class="note">Schedules run on the server (they fire even if no browser is open) and bypass the arm switch. Times follow the server's clock.</p>
+  </div>
+
+  <div class="card wide">
+    <h3><span>6. Event History (audit log)</span>
+      <span class="row" style="flex:0 0 auto;gap:6px">
+        <select id="ev-filter" style="margin:0;width:auto;padding:5px"><option value="">All</option><option value="trigger">Triggers</option><option value="alert">Alerts</option><option value="login">Logins</option><option value="arm">Arming</option></select>
+        <button class="btn btn-grey sm" id="ev-refresh">↻</button>
+        <button class="btn btn-grey sm admin-only" id="ev-verify">Verify chain</button>
+      </span></h3>
+    <div class="scroll"><table><thead><tr><th>Time</th><th>Type</th><th>Operator</th><th>Details</th><th>Delivery</th></tr></thead><tbody id="ev-body"></tbody></table></div>
+    <p class="note">Append-only, hash-chained log stored on the server as <code>siren_events.log</code>.</p>
+  </div>
+
+</div>
 </main>
+<div id="toasts"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-    // 1. Initialize Map with Box Zoom Enabled
-    const map = L.map('map', { boxZoom: true }).setView([14.7500, 120.9500], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    // 2. Define Siren Sites
-    const sirens = [
-        { id: "100.121.138.94", name: "Siren 01 - Mac Mini Site", lat: 7.286230521570723, lng: 125.39038400617271 },
-        { id: "100.118.38.113", name: "Siren 02 - Dell Optiplex", lat: 10.39172186580916, lng: 123.84760252637886 },
-        { id: "100.113.97.64", name: "Siren 03 - Lenovo Laptop (Server)", lat: 14.77495, lng: 120.95797 }
-    ];
-
-    const markerGroup = new L.featureGroup();
-    const siteMarkers = {};
-
-    sirens.forEach(s => {
-        const marker = L.circleMarker([s.lat, s.lng], {
-            color: '#64748b',
-            radius: 10, 
-            fillOpacity: 0.8
-        }).addTo(map);
-        
-        marker.bindPopup(`<b>${s.name}</b><br>IP: ${s.id}<br>Status: checking...`);
-        
-        marker.on('click', () => {
-            const selectEl = document.getElementById('target-select');
-            selectEl.value = s.id;
-            updateTelemetryPanel();
-        });
-
-        siteMarkers[s.id] = { marker, name: s.name, lat: s.lat, lng: s.lng };
-        markerGroup.addLayer(marker);
-    });
-
-    if (sirens.length > 0) {
-        map.fitBounds(markerGroup.getBounds().pad(0.2));
-    }
-
-    // Box zoom / drag selection (Hold Shift + Drag)
-    map.on('boxzoomend', function(e) {
-        const bounds = e.boxZoomBounds;
-        const selectedIds = [];
-
-        sirens.forEach(s => {
-            const point = map.latLngToContainerPoint([s.lat, s.lng]);
-            if (bounds.contains(point)) {
-                selectedIds.push(s.id);
-            }
-        });
-
-        const selectEl = document.getElementById('target-select');
-
-        if (selectedIds.length === 1) {
-            selectEl.value = selectedIds[0];
-        } else if (selectedIds.length === 2) {
-            selectEl.value = selectedIds[0];
-            alert(`Selected 2 stations: ${selectedIds.join(', ')} (Target set to first selected)`);
-        } else if (selectedIds.length >= 3) {
-            selectEl.value = "ALL";
-            alert("All stations selected - Target set to BROADCAST ALL SIRENS");
-        } else {
-            return;
-        }
-
-        selectEl.dispatchEvent(new Event('change'));
-        updateTelemetryPanel();
-    });
-
-    setTimeout(() => { map.invalidateSize(); }, 500);
-
-    // 3. Execution Logic & Timed Alarms Scheduler Engine
-    const BACKEND_URL = "http://100.113.97.64:8080"; 
-
-    function sendToneCommand() {
-        const target = document.getElementById('target-select').value;
-        const tone = document.getElementById('tone-select').value;
-        fetch(`${BACKEND_URL}/api/trigger`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'PLAY', target: target, tone: tone })
-        }).then(r => alert(`Triggered ${tone} on ${target}`));
-    }
-
-    function sendStopCommand() {
-        const target = document.getElementById('target-select').value;
-        fetch(`${BACKEND_URL}/api/trigger`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'STOP', target: target })
-        }).then(r => alert(`Stopped Alarms on ${target}`));
-    }
-
-    // Alarm Clock State & List Management
-    let alarmList = [];
-
-    function addNewAlarm() {
-        const timeVal = document.getElementById('alarm-time-input').value;
-        const toneVal = document.getElementById('alarm-tone').value;
-        const toneText = document.getElementById('alarm-tone').selectedOptions[0].text;
-        const durationVal = parseInt(document.getElementById('alarm-duration').value) || 5;
-        const targetVal = document.getElementById('target-select').value;
-
-        if (!timeVal) {
-            alert("Please select a valid alarm time (HH:MM).");
-            return;
-        }
-
-        const newAlarm = {
-            id: Date.now(),
-            time: timeVal, // "HH:MM"
-            tone: toneVal,
-            toneName: toneText,
-            duration: durationVal,
-            target: targetVal,
-            enabled: true,
-            triggeredToday: false
-        };
-
-        alarmList.push(newAlarm);
-        renderAlarmList();
-    }
-
-    function toggleAlarm(id) {
-        const alarm = alarmList.find(a => a.id === id);
-        if (alarm) {
-            alarm.enabled = !alarm.enabled;
-            alarm.triggeredToday = false; // Reset trigger state on toggle
-            renderAlarmList();
-        }
-    }
-
-    function deleteAlarm(id) {
-        alarmList = alarmList.filter(a => a.id !== id);
-        renderAlarmList();
-    }
-
-    function renderAlarmList() {
-        const container = document.getElementById('alarm-list-container');
-        if (alarmList.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: var(--text-sub); font-size: 0.8rem; margin: 10px 0;">No active alarms scheduled.</p>`;
-            return;
-        }
-
-        container.innerHTML = '';
-        alarmList.forEach(alarm => {
-            const div = document.createElement('div');
-            div.className = 'alarm-item';
-            div.innerHTML = `
-                <div class="alarm-info">
-                    <span class="alarm-time">${alarm.time}</span>
-                    <span class="alarm-desc">${alarm.toneName} (${alarm.duration} min) [Target: ${alarm.target}]</span>
-                </div>
-                <div class="alarm-controls">
-                    <label class="switch">
-                        <input type="checkbox" ${alarm.enabled ? 'checked' : ''} onchange="toggleAlarm(${alarm.id})">
-                        <span class="slider"></span>
-                    </label>
-                    <button class="btn-delete" onclick="deleteAlarm(${alarm.id})">✕</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-    }
-
-    // Background Clock & Alarm Trigger Checker Loop (Runs every second)
-    setInterval(() => {
-        const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        const currentTimeStr = `${hours}:${minutes}`;
-
-        document.getElementById('clock-display').textContent = `Current System Time: ${hours}:${minutes}:${seconds}`;
-
-        // Reset trigger flag if minute changes
-        if (seconds === "00") {
-            alarmList.forEach(alarm => {
-                if (alarm.time !== currentTimeStr) {
-                    alarm.triggeredToday = false;
-                }
-            });
-        }
-
-        // Check active alarms
-        alarmList.forEach(alarm => {
-            if (alarm.enabled && !alarm.triggeredToday && alarm.time === currentTimeStr) {
-                alarm.triggeredToday = true;
-                
-                // Trigger Alarm PLAY command
-                fetch(`${BACKEND_URL}/api/trigger`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ action: 'PLAY', target: alarm.target, tone: alarm.tone })
-                }).then(() => {
-                    console.log(`[ALARM TRIGGERED] ${alarm.tone} on target ${alarm.target} for ${alarm.duration} mins`);
-                });
-
-                // Set timer to stop alarm after configured duration
-                setTimeout(() => {
-                    fetch(`${BACKEND_URL}/api/trigger`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ action: 'STOP', target: alarm.target })
-                    }).then(() => {
-                        console.log(`[ALARM STOPPED] Timed alarm completed for target ${alarm.target}`);
-                    });
-                }, alarm.duration * 60 * 1000);
-            }
-        });
-    }, 1000);
-
-    // Initial render call
-    renderAlarmList();
-
-    let micStream;
-    let audioCtx;
-    let broadcastInterval;
-
-    function startLivePA() {
-        if (micStream) return;
-        const target = document.getElementById('target-select').value;
-
-        fetch(`${BACKEND_URL}/api/trigger`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'PLAY', target: target, tone: 'PA_BROADCAST' })
-        });
-
-        navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 44100, channelCount: 1 } }).then(stream => {
-            micStream = stream;
-
-            function recordAndSendWavChunk() {
-                if (!micStream) return;
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-                const source = audioCtx.createMediaStreamSource(micStream);
-                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-                let pcmBuffers = [];
-
-                processor.onaudioprocess = e => {
-                    const input = e.inputBuffer.getChannelData(0);
-                    pcmBuffers.push(new Float32Array(input));
-                };
-
-                source.connect(processor);
-                processor.connect(audioCtx.destination);
-
-                setTimeout(() => {
-                    processor.disconnect();
-                    source.disconnect();
-                    audioCtx.close();
-
-                    if (pcmBuffers.length === 0) return;
-                    let totalSamples = pcmBuffers.reduce((acc, b) => acc + b.length, 0);
-                    let samples = new Float32Array(totalSamples);
-                    let offset = 0;
-                    for (let b of pcmBuffers) {
-                        samples.set(b, offset);
-                        offset += b.length;
-                    }
-
-                    const wavBlob = encodeWAV(samples, 44100);
-                    fetch(`${BACKEND_URL}/api/stream_audio`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'audio/wav' },
-                        body: wavBlob
-                    });
-                }, 5000); 
-            }
-
-            recordAndSendWavChunk();
-            broadcastInterval = setInterval(recordAndSendWavChunk, 5200);
-
-            document.getElementById('start-btn').style.background = "#ef4444";
-            document.getElementById('start-btn').innerText = "🔴 BROADCASTING...";
-        }).catch(err => alert("Mic Access Error: " + err));
-    }
-
-    function encodeWAV(samples, sampleRate) {
-        let buffer = new ArrayBuffer(44 + samples.length * 2);
-        let view = new DataView(buffer);
-
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, 36 + samples.length * 2, true);
-        writeString(view, 8, 'WAVE');
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(view, 36, 'data');
-        view.setUint32(40, samples.length * 2, true);
-
-        let lng = samples.length;
-        let index = 44;
-        for (let i = 0; i < lng; i++) {
-            let s = Math.max(-1, Math.min(1, samples[i]));
-            view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-            index += 2;
-        }
-        return new Blob([view], { type: 'audio/wav' });
-    }
-
-    function writeString(view, offset, string) {
-        for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
-        }
-    }
-
-    function stopLivePA() {
-        const target = document.getElementById('target-select').value;
-        if (broadcastInterval) clearInterval(broadcastInterval);
-        if (micStream) {
-            micStream.getTracks().forEach(track => track.stop());
-            micStream = null;
-        }
-
-        fetch(`${BACKEND_URL}/api/trigger`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'STOP', target: target })
-        });
-
-        document.getElementById('start-btn').style.background = "#10b981";
-        document.getElementById('start-btn').innerText = "🎙 START BROADCAST";
-    }
-
-    // ============================================================
-    // 4. Live status polling: client connectivity + RS232 telemetry
-    // ============================================================
-    const STATUS_POLL_MS = 5000;
-    let lastStatusData = {}; 
-
-    async function pollStatus() {
-        try {
-            const res = await fetch(`${BACKEND_URL}/api/status`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            lastStatusData = await res.json();
-            applyStatusToMap();
-            applyStatusToHeader();
-            updateTelemetryPanel();
-        } catch (err) {
-            document.getElementById('vpn-status').textContent = 'Server unreachable';
-            document.getElementById('vpn-status').className = 'status-badge offline';
-        }
-    }
-
-    function applyStatusToMap() {
-        Object.entries(siteMarkers).forEach(([id, { marker, name }]) => {
-            const s = lastStatusData[id];
-            const online = s ? s.online : false;
-            marker.setStyle({ color: online ? '#10b981' : '#ef4444' });
-            const lastSeen = s && s.last_seen_seconds_ago !== null
-                ? `${s.last_seen_seconds_ago}s ago`
-                : 'never';
-            marker.setPopupContent(
-                `<b>${name}</b><br>IP: ${id}<br>Status: ${online ? 'Online' : 'Offline'} (last seen ${lastSeen})`
-            );
-        });
-    }
-
-    function applyStatusToHeader() {
-        const ids = Object.keys(siteMarkers);
-        const onlineCount = ids.filter(id => lastStatusData[id] && lastStatusData[id].online).length;
-        const badge = document.getElementById('vpn-status');
-        badge.textContent = `Sites: ${onlineCount}/${ids.length} Online`;
-        badge.className = 'status-badge' + (
-            onlineCount === ids.length ? '' : (onlineCount === 0 ? ' offline' : ' degraded')
-        );
-    }
-
-    function setTeleValue(id, text, cls) {
-        const el = document.getElementById(id);
-        el.textContent = text;
-        el.className = cls || '';
-    }
-
-    function updateTelemetryPanel() {
-        const target = document.getElementById('target-select').value;
-        const connBadge = document.getElementById('tele-conn-badge');
-        const note = document.getElementById('tele-note');
-
-        if (!lastStatusData[target]) {
-            connBadge.textContent = 'N/A';
-            connBadge.className = 'sub-status offline';
-            ['tele-conn','tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
-                .forEach(id => setTeleValue(id, '--'));
-            note.textContent = 'Select a single siren above to see its live RS232 status.';
-            return;
-        }
-
-        const s = lastStatusData[target];
-        connBadge.textContent = s.online ? 'ONLINE' : 'OFFLINE';
-        connBadge.className = 'sub-status ' + (s.online ? 'online' : 'offline');
-
-        const lastSeen = s.last_seen_seconds_ago !== null ? `${s.last_seen_seconds_ago}s ago` : 'never';
-        setTeleValue('tele-conn', s.online ? `Connected (${lastSeen})` : `Lost (last seen ${lastSeen})`, s.online ? 'ok' : 'bad');
-
-        if (!s.online) {
-            ['tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
-                .forEach(id => setTeleValue(id, 'No data', 'warn'));
-            note.textContent = 'This site\'s client.py has not reported in - RS232 data below is unavailable.';
-            return;
-        }
-
-        if (!s.rs232_ok || !s.rs232 || Object.keys(s.rs232).length === 0) {
-            ['tele-active','tele-volts','tele-amp','tele-driver','tele-door','tele-power','tele-vol']
-                .forEach(id => setTeleValue(id, 'No data', 'warn'));
-            note.textContent = s.rs232_error
-                ? `Client is online, but RS232 read failed: ${s.rs232_error}`
-                : 'Client is online, but no RS232 reading has come in yet.';
-            return;
-        }
-
-        const rs = s.rs232;
-        note.textContent = '';
-
-        setTeleValue('tele-active', rs['Active'] === '1' ? 'Yes' : 'No', rs['Active'] === '1' ? 'warn' : 'ok');
-        setTeleValue('tele-volts', rs['Batery'] || rs['Battery'] || '--');
-        setTeleValue('tele-vol', rs['Volume'] || '--');
-        setTeleValue('tele-power', rs['Power'] || '--', rs['Power'] === 'OFF' ? 'bad' : 'ok');
-        setTeleValue('tele-door', rs['Cabinet'] || '--', rs['Cabinet'] === 'OPEN' ? 'warn' : 'ok');
-
-        const test = rs['Test'];
-        if (test === 'ERROR') {
-            const badAmps = rs['BadAmplifiers'] || '0';
-            const badDrv = rs['BadDrivers'] || '0';
-            setTeleValue('tele-amp', badAmps !== '0' ? `FAULT (${badAmps})` : 'Ready', badAmps !== '0' ? 'bad' : 'ok');
-            setTeleValue('tele-driver', badDrv !== '0' ? `FAULT (${badDrv})` : 'OK', badDrv !== '0' ? 'bad' : 'ok');
-        } else if (test === 'OK') {
-            setTeleValue('tele-amp', 'Ready', 'ok');
-            setTeleValue('tele-driver', 'OK', 'ok');
-        } else {
-            setTeleValue('tele-amp', 'Not tested', 'warn');
-            setTeleValue('tele-driver', 'Not tested', 'warn');
-        }
-    }
-
-    document.getElementById('target-select').addEventListener('change', updateTelemetryPanel);
-
-    pollStatus();
-    setInterval(pollStatus, STATUS_POLL_MS);
+// When served by server.py (http://<server>:8080/) the API is same-origin. If you open this
+// file directly from disk, it falls back to the address below.
+const BACKEND_URL = location.protocol.startsWith('http') ? location.origin : "http://100.113.97.64:8080";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg, kind='') { const d=document.createElement('div'); d.className='toast '+kind; d.textContent=msg; $('toasts').appendChild(d); setTimeout(()=>d.remove(), kind==='err'?7000:4000); }
+const store = { get:k=>{try{return sessionStorage.getItem(k)}catch{return null}}, set:(k,v)=>{try{sessionStorage.setItem(k,v)}catch{}}, del:k=>{try{sessionStorage.removeItem(k)}catch{}} };
+
+// ---------------------------------------------------------------- auth
+let token = store.get('token'), me = null, started = false;
+async function api(path, opts={}) {
+  const headers = {'Content-Type':'application/json', ...(token?{Authorization:'Bearer '+token}:{}), ...(opts.headers||{})};
+  const res = await fetch(BACKEND_URL+path, {method:opts.method||'GET', headers, body: opts.rawBody ?? (opts.body?JSON.stringify(opts.body):undefined)});
+  let data=null; try{ data=await res.json(); }catch{}
+  if (res.status===401 && path!=='/api/login') { showLogin('Session expired - please sign in again'); throw new Error('Not signed in'); }
+  if (!res.ok) throw new Error((data&&data.detail)||('HTTP '+res.status));
+  return data;
+}
+function showLogin(msg='') { $('login').classList.remove('hidden'); $('lg-err').textContent=msg; token=null; store.del('token'); }
+async function doLogin() {
+  $('lg-err').textContent='';
+  try {
+    const r = await api('/api/login',{method:'POST',body:{username:$('lg-user').value.trim(),password:$('lg-pass').value}});
+    token=r.token; store.set('token',token); $('lg-pass').value='';
+    await afterLogin(r.user, r.role);
+  } catch(e) { $('lg-err').textContent = e.message; }
+}
+async function afterLogin(user, role) {
+  me={user,role}; document.body.dataset.role=role; $('whoami').textContent=`${user} (${role})`;
+  $('login').classList.add('hidden');
+  if (!started) { started=true; await startApp(); }
+  pollStatus(); loadEvents(); loadSchedules(); loadHistory();
+}
+$('lg-btn').onclick=doLogin; $('lg-pass').onkeydown=e=>{if(e.key==='Enter')doLogin()}; $('lg-user').onkeydown=e=>{if(e.key==='Enter')$('lg-pass').focus()};
+$('logout-btn').onclick=()=>{ showLogin(); stopLivePA(true); };
+
+// ---------------------------------------------------------------- map / stations / geofence
+const map = L.map('map').setView([12,122],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+let stations=[], stationsById={}, groups={}, markers={}, customIds=[], lastStatus={sites:{},system:{},alerts:[],pending:[],timers:[]};
+const drawn = new L.FeatureGroup().addTo(map);
+map.addControl(new L.Control.Draw({
+  draw:{polygon:{allowIntersection:false,showArea:false,shapeOptions:{color:'#3b82f6'}},rectangle:{showArea:false,shapeOptions:{color:'#3b82f6'}},circle:{shapeOptions:{color:'#3b82f6'}},polyline:false,marker:false,circlemarker:false},
+  edit:{featureGroup:drawn,edit:false}}));
+map.on('draw:created', e => { drawn.clearLayers(); drawn.addLayer(e.layer); applyGeofence(e.layer); });
+map.on('draw:deleted', () => clearGeofence());
+function inLayer(layer, s) {
+  const p = L.latLng(s.lat, s.lng);
+  if (layer instanceof L.Circle) return layer.getLatLng().distanceTo(p) <= layer.getRadius();
+  const ring = layer.getLatLngs()[0]; let inside=false;
+  for (let i=0,j=ring.length-1;i<ring.length;j=i++) {
+    const a=ring[i], b=ring[j];
+    if (((a.lat>p.lat)!==(b.lat>p.lat)) && (p.lng < (b.lng-a.lng)*(p.lat-a.lat)/(b.lat-a.lat)+a.lng)) inside=!inside;
+  }
+  return inside;
+}
+function applyGeofence(layer) {
+  customIds = stations.filter(s=>inLayer(layer,s)).map(s=>s.id);
+  let opt = [...$('target-select').options].find(o=>o.value==='CUSTOM');
+  if (!opt) { opt=new Option('', 'CUSTOM'); $('target-select').add(opt, 1); }
+  opt.text = `🗺 Map selection (${customIds.length} siren${customIds.length===1?'':'s'})`;
+  $('target-select').value='CUSTOM';
+  toast(customIds.length ? `${customIds.length} siren(s) inside the drawn area` : 'No sirens inside the drawn area', customIds.length?'ok':'warn');
+  onTargetChange();
+}
+function clearGeofence() {
+  customIds=[]; const opt=[...$('target-select').options].find(o=>o.value==='CUSTOM');
+  if (opt) opt.remove(); if ($('target-select').value==='CUSTOM') $('target-select').value='ALL'; onTargetChange();
+}
+function targetIps() {
+  const v=$('target-select').value;
+  if (v==='ALL') return stations.map(s=>s.id);
+  if (v==='CUSTOM') return customIds;
+  if (groups[v]) return groups[v].members;
+  return stationsById[v] ? [v] : [];
+}
+function targetPayload() {
+  const v=$('target-select').value;
+  return v==='CUSTOM' ? {target:'CUSTOM', targets:customIds} : {target:v};
+}
+function targetLabel(v=$('target-select').value) {
+  if (v==='ALL') return 'all sirens'; if (v==='CUSTOM') return `${customIds.length} selected sirens`;
+  return groups[v]?.label || stationsById[v]?.name || v;
+}
+function telemetrySite() {
+  const v=$('target-select').value;
+  if (stationsById[v]) return v; if (v==='CUSTOM' && customIds.length===1) return customIds[0]; return null;
+}
+function onTargetChange() {
+  const n=targetIps().length; $('target-info').textContent=`Commands will go to ${n} siren${n===1?'':'s'}: ${targetLabel()}`;
+  updateTelemetry(); loadHistory();
+}
+$('target-select').onchange=onTargetChange;
+
+async function startApp() {
+  const st = await api('/api/stations');
+  stations = st.stations; groups = st.groups; stationsById = Object.fromEntries(stations.map(s=>[s.id,s]));
+  const sel=$('target-select'); sel.innerHTML='<option value="ALL">📢 BROADCAST ALL SIRENS</option>';
+  const og1=document.createElement('optgroup'); og1.label='Groups';
+  Object.entries(groups).forEach(([k,g])=>og1.appendChild(new Option(g.label,k))); sel.appendChild(og1);
+  const og2=document.createElement('optgroup'); og2.label='Individual Sirens';
+  stations.forEach(s=>og2.appendChild(new Option(s.name,s.id))); sel.appendChild(og2);
+  const bounds=[];
+  stations.forEach(s=>{
+    const m=L.circleMarker([s.lat,s.lng],{color:'#64748b',radius:10,fillOpacity:.8}).addTo(map);
+    m.bindPopup(`<b>${esc(s.name)}</b><br>IP: ${esc(s.id)}<br>Status: checking...`);
+    m.on('click',()=>{ sel.value=s.id; onTargetChange(); });
+    markers[s.id]=m; bounds.push([s.lat,s.lng]);
+  });
+  if (bounds.length) map.fitBounds(bounds,{padding:[60,60]});
+  setTimeout(()=>map.invalidateSize(),400);
+  // tone dropdowns for timers/schedules mirror the main tone list
+  ['timer-tone','sc-tone'].forEach(id=>{ $(id).innerHTML=$('tone-select').innerHTML; });
+  const tpls=[['','— choose a template —'],
+    ['Attention. Flash flood warning is in effect for {target}. Move to higher ground immediately.','Flash flood warning'],
+    ['Attention. This is an evacuation order for {target}. Proceed calmly to your designated evacuation center.','Evacuation order'],
+    ['Attention. A strong earthquake has been detected. Move away from buildings and the coastline.','Earthquake / tsunami'],
+    ['Attention. The emergency in {target} has ended. This is an all clear.','All clear'],
+    ['This is a test of the public warning system for {target}. This is only a test.','System test']];
+  $('tts-template').innerHTML=''; tpls.forEach(([v,t])=>$('tts-template').add(new Option(t,v)));
+  onTargetChange();
+  setInterval(pollStatus,3000); setInterval(loadEvents,10000); setInterval(loadHistory,60000); setInterval(tickClocks,1000);
+}
+
+// ---------------------------------------------------------------- arm interlock
+let armDeadline=0;
+function tickClocks(){ renderArm(); renderTimers(); }
+function renderArm() {
+  const left=Math.max(0,Math.round((armDeadline-Date.now())/1000)), armed=left>0;
+  const b=$('arm-btn'); b.classList.toggle('armed',armed);
+  b.textContent=armed?`🔓 ARMED ${Math.floor(left/60)}:${String(left%60).padStart(2,'0')} — click to DISARM`:'🔒 SAFE — click to ARM';
+  document.querySelectorAll('.needs-arm').forEach(x=>x.disabled=!armed);
+}
+$('arm-btn').onclick=async()=>{
+  const want = Date.now()>=armDeadline;
+  if (want && !confirm('ARM the system? High-decibel alarms and PA can be triggered while armed.')) return;
+  try { const r=await api('/api/arm',{method:'POST',body:{armed:want}}); armDeadline=Date.now()+r.seconds_left*1000; renderArm(); }
+  catch(e){ toast(e.message,'err'); }
+};
+
+// ---------------------------------------------------------------- commands
+async function trigger(body, okMsg) {
+  try {
+    const r=await api('/api/trigger',{method:'POST',body}); 
+    const kind = r.status==='success'?'ok':'warn';
+    toast(`${okMsg} - delivered to ${Object.values(r.delivery).filter(x=>x.ok).length}/${r.dispatched_ips.length} siren(s)`, kind);
+    Object.entries(r.delivery).forEach(([ip,d])=>{ if(!d.ok) toast(`${stationsById[ip]?.name||ip}: ${d.detail}`,'err'); });
+    if (body.action==='PLAY') armDeadline=0; renderArm(); loadEvents(); pollStatus();
+    return r;
+  } catch(e){ toast(e.message,'err'); }
+}
+$('play-btn').onclick=()=>{ const t=$('tone-select').value; if(confirm(`Play ${t} on ${targetLabel()}?`)) trigger({action:'PLAY',tone:t,...targetPayload()},`${t} started`); };
+$('stop-btn').onclick=()=>trigger({action:'STOP',...targetPayload()},'STOP sent');
+$('timer-start').onclick=()=>{ const t=$('timer-tone').value, m=parseInt($('timer-min').value)||5;
+  if(confirm(`Play ${t} on ${targetLabel()} for ${m} minute(s)?`)) trigger({action:'PLAY',tone:t,duration_min:m,...targetPayload()},`Timed alarm ${t} (${m} min)`); };
+$('selftest-btn').onclick=async()=>{
+  const r=await trigger({action:'TEST',tone:'SELF_DIAGNOSTIC',...targetPayload()},'Self-test requested');
+  if (r) $('selftest-note').textContent=`Requested ${new Date().toLocaleTimeString()} — results appear below within ~1 min.`;
+};
+
+// ---------------------------------------------------------------- microphone, VU meter, PA
+let micStream=null, audioCtx=null, analyser=null, srcNode=null, procNode=null, meterOn=false, paActive=false;
+let pcm=[], chunkTimer=null, lastUploadMs=null, peak=0, peakAt=0, clipUntil=0;
+async function ensureMic() {
+  if (micStream) { if (audioCtx.state==='suspended') await audioCtx.resume(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone needs HTTPS or localhost. Open the dashboard at http://localhost:8080 on the server PC.');
+  micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1}});
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  srcNode=audioCtx.createMediaStreamSource(micStream);
+  analyser=audioCtx.createAnalyser(); analyser.fftSize=1024; srcNode.connect(analyser);
+  requestAnimationFrame(drawMeter);
+}
+function stopMic() {
+  if (procNode){procNode.disconnect();procNode=null;}
+  if (micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+  if (audioCtx){audioCtx.close();audioCtx=null;}
+  analyser=null; $('vu-fill').style.width='0'; $('vu-peak').style.left='0'; $('vu-db').textContent='Mic off'; $('vu-clip').textContent='';
+}
+function drawMeter() {
+  if (!analyser) return;
+  const buf=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buf);
+  let sum=0, mx=0; for (const v of buf){sum+=v*v; mx=Math.max(mx,Math.abs(v));}
+  const db=20*Math.log10(Math.sqrt(sum/buf.length)||1e-6), pct=Math.max(0,Math.min(100,(db+60)/60*100));
+  $('vu-fill').style.width=pct+'%';
+  const now=performance.now(); if (pct>=peak||now-peakAt>800){peak=Math.max(pct,peak-1.5);peakAt=pct>=peak?now:peakAt;}
+  $('vu-peak').style.left=Math.min(99.5,peak)+'%';
+  if (mx>=0.99) clipUntil=now+1200;
+  $('vu-db').textContent=`${db<-59?'-∞':db.toFixed(0)} dBFS` + (db>-12?'  (loud)':db<-45?'  (too quiet?)':'');
+  $('vu-clip').textContent=now<clipUntil?'CLIPPING - move back / lower gain':'';
+  requestAnimationFrame(drawMeter);
+}
+$('mic-test-btn').onclick=async()=>{
+  if (meterOn) { meterOn=false; if(!paActive) stopMic(); $('mic-test-btn').textContent='🎚 Test Microphone'; return; }
+  try { await ensureMic(); meterOn=true; $('mic-test-btn').textContent='⏹ Stop Mic Test'; } catch(e){ toast(e.message,'err'); }
+};
+function encodeWAV(samples, rate) {
+  const buf=new ArrayBuffer(44+samples.length*2), v=new DataView(buf);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF'); v.setUint32(4,36+samples.length*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true);
+  v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,rate,true); v.setUint32(28,rate*2,true);
+  v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,samples.length*2,true);
+  let o=44; for (const s0 of samples){const s=Math.max(-1,Math.min(1,s0)); v.setInt16(o,s<0?s*0x8000:s*0x7FFF,true); o+=2;}
+  return new Blob([v],{type:'audio/wav'});
+}
+async function flushChunk() {
+  if (!pcm.length) return;
+  const bufs=pcm; pcm=[]; const n=bufs.reduce((a,b)=>a+b.length,0), all=new Float32Array(n); let o=0;
+  for (const b of bufs){all.set(b,o);o+=b.length;}
+  const t0=performance.now();
+  try { await api('/api/stream_audio',{method:'POST',rawBody:encodeWAV(all,audioCtx.sampleRate),headers:{'Content-Type':'audio/wav'}}); lastUploadMs=performance.now()-t0; }
+  catch(e){ toast('Audio upload failed: '+e.message,'err'); }
+}
+$('pa-start-btn').onclick=async()=>{
+  if (paActive) return;
+  try { await ensureMic(); } catch(e){ toast(e.message,'err'); return; }
+  const r=await trigger({action:'PLAY',tone:'PA_BROADCAST',...targetPayload()},'PA broadcast started');
+  if (!r) { if(!meterOn) stopMic(); return; }
+  paActive=true; pcm=[];
+  procNode=audioCtx.createScriptProcessor(4096,1,1);
+  procNode.onaudioprocess=e=>pcm.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  srcNode.connect(procNode); procNode.connect(audioCtx.destination);
+  chunkTimer=setInterval(flushChunk,5000);
+  $('pa-start-btn').textContent='🔴 BROADCASTING...';
+};
+async function stopLivePA(silent) {
+  if (chunkTimer){clearInterval(chunkTimer);chunkTimer=null;}
+  const was=paActive; paActive=false;
+  if (procNode){procNode.disconnect();procNode=null;}
+  if (!meterOn) stopMic();
+  $('pa-start-btn').textContent='🎙 START BROADCAST'; $('pa-latency').innerHTML='';
+  if (was && !silent) trigger({action:'STOP',...targetPayload()},'PA broadcast stopped');
+}
+$('pa-stop-btn').onclick=()=>stopLivePA(false);
+function renderLatency() {
+  if (!paActive) return;
+  const rows=targetIps().map(ip=>{ const p=lastStatus.sites[ip]?.pa||{}; const pm=p.pipeline_ms;
+    const tot=pm!=null?(5+(lastUploadMs||0)/1000+pm/1000).toFixed(1)+' s':'…';
+    return `<tr><td>${esc(stationsById[ip]?.name||ip)}</td><td>${pm!=null?(pm/1000).toFixed(1)+' s':'…'}</td><td><b>${tot}</b></td></tr>`; }).join('');
+  $('pa-latency').innerHTML=`<table><thead><tr><th>Siren</th><th>Server→speaker</th><th>Mic→speaker (est.)</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">Chunk buffer 5.0 s + your upload ${lastUploadMs!=null?(lastUploadMs/1000).toFixed(2)+' s':'…'} + server→speaker delay (measured by each client).</p>`;
+}
+
+// ---------------------------------------------------------------- TTS
+$('tts-template').onchange=()=>{ $('tts-text').value=$('tts-template').value.replace('{target}',targetLabel()); };
+$('tts-preview').onclick=()=>{ const t=$('tts-text').value.trim(); if(!t) return;
+  if (!('speechSynthesis' in window)) return toast('Browser has no speech synthesis','err');
+  speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(t)); };
+$('tts-send').onclick=async()=>{
+  const text=$('tts-text').value.trim(); if(!text) return toast('Enter an announcement first','warn');
+  if(!confirm(`Broadcast this announcement on ${targetLabel()}?\n\n"${text}"`)) return;
+  try { const r=await api('/api/tts',{method:'POST',body:{text,repeat:+$('tts-repeat').value,...targetPayload()}});
+    armDeadline=0; renderArm(); toast(`Announcement started (${r.seconds}s x ${r.repeat})`,'ok'); loadEvents(); }
+  catch(e){ toast(e.message,'err'); }
+};
+
+// ---------------------------------------------------------------- status polling & rendering
+let pollBusy=false, knownAlerts=new Set(), soundOn=true;
+async function pollStatus() {
+  if (pollBusy||!token) return; pollBusy=true;
+  try { lastStatus=await api('/api/status'); lastStatus._at=Date.now(); armDeadline=Date.now()+(lastStatus.system.arm_seconds_left||0)*1000;
+    renderMap(); renderHeader(); updateTelemetry(); renderAlerts(); renderTimers(); renderLatency(); renderArm();
+    $('tts-note').textContent = lastStatus.system.tts_available ? "Preview uses your browser's voice. Broadcast renders speech on the server." : "Server TTS not installed: run 'pip install pyttsx3' on the server to enable broadcasting (preview still works).";
+  } catch(e){ if(e.message!=='Not signed in'){ $('vpn-status').textContent='Server unreachable'; $('vpn-status').className='status-badge offline'; } }
+  pollBusy=false;
+}
+function renderMap() {
+  stations.forEach(s=>{
+    const st=lastStatus.sites[s.id], m=markers[s.id]; if(!m||!st) return;
+    const al=lastStatus.alerts.filter(a=>a.site===s.id && !a.cleared);
+    const crit=al.some(a=>a.severity==='critical'), warn=al.length>0;
+    m.setStyle({color: !st.online?'#ef4444': crit?'#ef4444': warn?'#f59e0b':'#10b981'});
+    const el=m.getElement(); if (el) el.classList.toggle('pulse', st.online && crit);
+    const ls=st.last_seen_seconds_ago!=null?`${st.last_seen_seconds_ago}s ago`:'never';
+    m.setPopupContent(`<b>${esc(s.name)}</b><br>IP: ${esc(s.id)}<br>Status: ${st.online?'Online':'Offline'} (last seen ${ls})`+al.map(a=>`<br>⚠ ${esc(a.message)}`).join(''));
+  });
+}
+function renderHeader() {
+  const ids=stations.map(s=>s.id), on=ids.filter(i=>lastStatus.sites[i]?.online).length, b=$('vpn-status');
+  b.textContent=`Sites: ${on}/${ids.length} Online`; b.className='status-badge'+(on===ids.length?'':on===0?' offline':' degraded');
+  $('clock').textContent='Server '+(lastStatus.system.server_time||'').slice(11,19);
+}
+function setT(id,text,cls){ const e=$(id); e.textContent=text; e.className=cls||''; }
+const T_IDS=['t-active','t-bat','t-chg','t-temp','t-pwr','t-door','t-amp','t-drv','t-test','t-vol'];
+function updateTelemetry() {
+  const site=telemetrySite(), badge=$('tele-badge'), note=$('tele-note');
+  if (!site || !lastStatus.sites[site]) { badge.textContent='N/A'; badge.className='sub-status offline'; setT('t-conn','--'); T_IDS.forEach(i=>setT(i,'--'));
+    note.textContent='Select a single siren above to see its live RS232 status.'; return; }
+  const s=lastStatus.sites[site]; badge.textContent=s.online?'ONLINE':'OFFLINE'; badge.className='sub-status '+(s.online?'online':'offline');
+  const ls=s.last_seen_seconds_ago!=null?`${s.last_seen_seconds_ago}s ago`:'never';
+  setT('t-conn', s.online?`Connected (${ls})`:`Lost (last seen ${ls})`, s.online?'ok':'bad');
+  if (!s.online) { T_IDS.forEach(i=>setT(i,'No data','warn')); note.textContent="This site's client has not reported in."; return; }
+  if (!s.rs232_ok || !Object.keys(s.rs232||{}).length) { T_IDS.forEach(i=>setT(i,'No data','warn'));
+    note.textContent=s.rs232_error?`Client is online, but RS232 read failed: ${s.rs232_error}`:'Client online; no RS232 reading yet.'; return; }
+  const r=s.rs232, sys=lastStatus.system; note.textContent='';
+  setT('t-active', r.Active==='1'?'Yes':'No', r.Active==='1'?'warn':'ok');
+  const bat=parseFloat(r.Batery||r.Battery); setT('t-bat', r.Batery||r.Battery||'--', bat<sys.battery_low_v?'bad':'');
+  setT('t-chg', r.Charger||'--'); const tp=parseFloat(r.Temp); setT('t-temp', r.Temp||'--', tp>sys.temp_high_c?'bad':'');
+  setT('t-pwr', r.Power==='OFF'?'OFF - on battery':(r.Power||'--'), r.Power==='OFF'?'bad':'ok');
+  setT('t-door', r.Cabinet||'--', r.Cabinet==='OPEN'?'bad':'ok'); setT('t-vol', r.Volume||'--');
+  const ba=r.BadAmplifiers||'0', bd=r.BadDrivers||'0';
+  if (r.Test==='ERROR') { setT('t-amp', ba!=='0'?`FAULT (${ba})`:'Ready', ba!=='0'?'bad':'ok'); setT('t-drv', bd!=='0'?`FAULT (${bd})`:'OK', bd!=='0'?'bad':'ok'); }
+  else if (r.Test==='OK') { setT('t-amp','Ready','ok'); setT('t-drv','OK','ok'); }
+  else { setT('t-amp','Not tested','warn'); setT('t-drv','Not tested','warn'); }
+  setT('t-test', r.Test==='N/A'?'Not run yet':r.Test, r.Test==='OK'?'ok':r.Test==='ERROR'?'bad':'warn');
+}
+
+// ---- alerts, sound, desktop notifications
+let audioCtxBeep=null;
+function beep() { try { audioCtxBeep=audioCtxBeep||new (window.AudioContext||window.webkitAudioContext)(); const c=audioCtxBeep;
+  [880,660].forEach((f,i)=>{ const o=c.createOscillator(), g=c.createGain(); o.frequency.value=f; o.connect(g); g.connect(c.destination);
+    g.gain.setValueAtTime(.15,c.currentTime+i*.25); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+i*.25+.22); o.start(c.currentTime+i*.25); o.stop(c.currentTime+i*.25+.23); }); } catch{} }
+setInterval(()=>{ if(soundOn && token && (lastStatus.alerts.some(a=>!a.cleared&&a.severity==='critical')||lastStatus.pending.length)) beep(); },3000);
+$('mute-btn').onclick=()=>{ soundOn=!soundOn; $('mute-btn').textContent=soundOn?'🔔':'🔕';
+  if (soundOn && 'Notification' in window && Notification.permission==='default') Notification.requestPermission(); };
+function renderAlerts() {
+  const ICON={tamper:'🚪',power:'🔌',fault:'🛠',offline:'📡',battery_low:'🔋',temp_high:'🌡'};
+  let h='';
+  lastStatus.pending.forEach(p=>{ h+=`<div class="abar pending"><span class="msg">⚠ <b>ALERT FEED:</b> ${esc(p.summary)} → ${p.ips.length} siren(s), tone <b>${esc(p.tone)}</b>${p.duration_min?` (${p.duration_min} min)`:''}</span>
+    <span class="op-only"><button class="btn btn-red sm" onclick="pendingAct('${p.id}','dispatch')">DISPATCH</button> <button class="btn btn-grey sm" onclick="pendingAct('${p.id}','dismiss')">Dismiss</button></span></div>`; });
+  lastStatus.alerts.forEach(a=>{ h+=`<div class="abar ${a.severity}${a.cleared?' cleared':''}"><span class="msg">${ICON[a.kind]||'⚠'} ${esc(a.message)}${a.cleared?' <i>(condition cleared)</i>':''}</span>
+    <span class="op-only"><button class="btn btn-grey sm" onclick="ackAlert('${a.id}')">Acknowledge</button></span></div>`; });
+  $('alert-bar').innerHTML=h;
+  lastStatus.alerts.forEach(a=>{ if(!knownAlerts.has(a.id)){ knownAlerts.add(a.id);
+    if (soundOn && 'Notification' in window && Notification.permission==='granted' && !a.cleared) new Notification('Siren CCC alert',{body:a.message}); }});
+}
+async function ackAlert(id){ try{ await api(`/api/alerts/${id}/ack`,{method:'POST'}); pollStatus(); }catch(e){toast(e.message,'err');} }
+async function pendingAct(id,act){
+  if (act==='dispatch' && !confirm('DISPATCH this alert to the sirens now?')) return;
+  try { await api(`/api/pending/${id}/${act}`,{method:'POST'}); toast(act==='dispatch'?'Alert dispatched':'Dismissed','ok'); pollStatus(); loadEvents(); }
+  catch(e){toast(e.message,'err');}
+}
+
+// ---- running timers
+function renderTimers() {
+  const t=lastStatus.timers||[]; if(!t.length){ $('timers-list').textContent='No timed alarms running.'; return; }
+  const el=Date.now(); 
+  $('timers-list').innerHTML=t.map(x=>{ const left=Math.max(0,x.seconds_left-Math.round((el-(lastStatus._at||el))/1000)); 
+    return `<div class="row" style="align-items:center;margin-top:4px"><span><b>${esc(x.tone)}</b> on ${x.ips.length} siren(s) — ${Math.floor(left/60)}m ${String(left%60).padStart(2,'0')}s left (by ${esc(x.by)})</span>
+    <button class="btn btn-red sm op-only" style="flex:0 0 auto" onclick='cancelTimer(${JSON.stringify(x.ips)})'>Cancel</button></div>`; }).join('');
+}
+async function cancelTimer(ips){ trigger({action:'STOP',target:'CUSTOM',targets:ips},'Timer cancelled / STOP sent'); }
+
+// ---------------------------------------------------------------- history charts
+let chartBat=null, chartTemp=null;
+function fmtT(ms,hours){ const d=new Date(ms); return hours>24?`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:00`:`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function mkChart(canvas,title,color){ 
+  return new Chart($(canvas),{type:'line',data:{datasets:[]},options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{title:{display:true,text:title,color:'#cbd5e1'},legend:{labels:{color:'#94a3b8',boxWidth:12}}},
+    scales:{x:{type:'linear',ticks:{color:'#94a3b8',maxTicksLimit:6},grid:{color:'#1e293b'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}}); }
+async function loadHistory() {
+  const site=telemetrySite(), note=$('chart-note'); if(!token) return;
+  if (typeof Chart==='undefined') { note.textContent='Chart.js failed to load (no internet?)'; return; }
+  chartBat=chartBat||mkChart('chart-bat','Battery / charger voltage (V)'); chartTemp=chartTemp||mkChart('chart-temp','Enclosure temperature (°C)');
+  if (!site) { [chartBat,chartTemp].forEach(c=>{c.data.datasets=[];c.update();}); note.textContent='Select a single siren to see its history.'; return; }
+  const hours=+$('hist-range').value;
+  try {
+    const r=await api(`/api/history?site=${encodeURIComponent(site)}&hours=${hours}`);
+    const pts=r.points, xs=pts.map(p=>p.t*1000), x0=xs[0]??Date.now()-hours*3600e3, x1=xs[xs.length-1]??Date.now();
+    const line=(k)=>pts.map(p=>({x:p.t*1000,y:p[k]}));
+    const thr=(v,label)=>({label,data:[{x:x0,y:v},{x:x1,y:v}],borderColor:'#ef4444',borderDash:[6,4],borderWidth:1,pointRadius:0});
+    const lowV=lastStatus.system.battery_low_v, hiT=lastStatus.system.temp_high_c;
+    chartBat.data.datasets=[{label:'Battery',data:line('battery'),borderColor:'#10b981',borderWidth:2,pointRadius:0,tension:.2},
+      {label:'Charger',data:line('charger'),borderColor:'#3b82f6',borderWidth:1,pointRadius:0,tension:.2}, ...(lowV?[thr(lowV,'Low threshold')]:[])];
+    chartTemp.data.datasets=[{label:'Temp',data:line('temp'),borderColor:'#f59e0b',borderWidth:2,pointRadius:0,tension:.2}, ...(hiT?[thr(hiT,'High threshold')]:[])];
+    [chartBat,chartTemp].forEach(c=>{c.options.scales.x.ticks.callback=v=>fmtT(v,hours); c.update();});
+    note.textContent=pts.length?`${pts.length} points (averaged). A falling battery line while AC power is ON points to a failing battery.`:'No history yet - samples are stored every ~30 s while the site is online.';
+  } catch(e){ note.textContent='History unavailable: '+e.message; }
+}
+$('hist-range').onchange=loadHistory;
+
+// ---------------------------------------------------------------- schedules
+function updateScForm(){ const t=$('sc-type').value;
+  $('sc-date-w').classList.toggle('hidden',t!=='once'); $('sc-dow-w').classList.toggle('hidden',t!=='weekly'); $('sc-cron-w').classList.toggle('hidden',t!=='cron');
+  $('sc-time').parentElement.classList.toggle('hidden',t==='cron'); }
+$('sc-type').onchange=updateScForm; updateScForm();
+$('sc-add').onclick=async()=>{
+  const t=$('sc-type').value, [h,m]=($('sc-time').value||'12:00').split(':').map(Number);
+  const body={name:$('sc-name').value.trim()||'Schedule',tone:$('sc-tone').value,duration_min:+$('sc-dur').value||1,...targetPayload()};
+  if (t==='once') { if(!$('sc-date').value) return toast('Pick a date','warn'); body.type='once'; body.run_at=`${$('sc-date').value}T${$('sc-time').value}`; }
+  else { body.type='cron'; body.cron = t==='cron'?$('sc-cron').value.trim(): t==='daily'?`${m} ${h} * * *`: t==='weekdays'?`${m} ${h} * * 1-5`:`${m} ${h} * * ${$('sc-dow').value}`; }
+  try { await api('/api/schedules',{method:'POST',body}); toast('Schedule added','ok'); loadSchedules(); loadEvents(); } catch(e){ toast(e.message,'err'); }
+};
+async function loadSchedules(){
+  try { const list=await api('/api/schedules');
+    $('sc-body').innerHTML=list.length?list.map(s=>{
+      const tgt=s.targets?.length?`${s.targets.length} sirens (map)`:(groups[s.target]?.label||stationsById[s.target]?.name||s.target);
+      return `<tr style="${s.enabled?'':'opacity:.5'}"><td>${esc(s.name)}</td><td>${s.type==='cron'?`<code>${esc(s.cron)}</code>`:esc((s.run_at||'').replace('T',' '))}</td><td>${esc(tgt)}</td><td>${esc(s.tone)} ${s.duration_min}m</td>
+      <td>${esc((s.next_run||'—').replace('T',' '))}</td><td>${esc((s.last_run||'—').replace('T',' '))}${s.last_result?`<br><span class="note">${esc(s.last_result)}</span>`:''}</td>
+      <td class="admin-only" style="white-space:nowrap"><button class="btn btn-grey sm" onclick="schedAct('${s.id}','toggle')">${s.enabled?'Disable':'Enable'}</button> <button class="btn btn-red sm" onclick="schedAct('${s.id}','delete')">✕</button></td></tr>`; }).join('')
+      :'<tr><td colspan="7" class="note">No schedules yet.</td></tr>';
+  } catch(e){}
+}
+async function schedAct(id,act){ try{ if(act==='delete'){ if(!confirm('Delete this schedule?')) return; await api('/api/schedules/'+id,{method:'DELETE'}); } else await api(`/api/schedules/${id}/toggle`,{method:'POST'}); loadSchedules(); loadEvents(); }catch(e){toast(e.message,'err');} }
+setInterval(()=>{ if(token) loadSchedules(); },30000);
+
+// ---------------------------------------------------------------- event log
+function summarize(e){
+  const nm=ip=>stationsById[ip]?.name||ip;
+  switch(e.type){
+    case 'trigger': return `<b>${esc(e.action)}</b> ${esc(e.tone)} → ${(e.ips||[]).map(nm).map(esc).join(', ')}${e.duration_min?` (${e.duration_min} min)`:''} <span class="note">[${esc(e.source)}${e.remote?' @ '+esc(e.remote):''}]</span>`;
+    case 'alert': case 'alert_cleared': return `${esc(e.detail||e.kind)} ${e.site?`<span class="note">(${esc(nm(e.site))})</span>`:''}`;
+    case 'login': case 'login_failed': return `from ${esc(e.remote||'?')}`;
+    case 'arm': return e.armed?'System ARMED':'System DISARMED';
+    case 'tts': return `TTS: “${esc(e.text)}” x${e.repeat}`;
+    case 'alert_feed': return `${esc(e.rule)} (${esc(e.mode)}): ${esc(e.summary)}`;
+    default: return esc(e.detail||e.schedule||JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k])=>!['ts','epoch','type','prev','hash','operator','role'].includes(k)))));
+  }
+}
+async function loadEvents(){
+  if(!token) return;
+  try { const f=$('ev-filter').value, list=await api('/api/events?limit=100'+(f?'&type='+f:''));
+    $('ev-body').innerHTML=list.map(e=>{
+      let del=''; if(e.delivery){ const bad=Object.entries(e.delivery).filter(([,d])=>!d.ok);
+        del=`<span class="${bad.length?'bad':'ok'}">${esc(e.delivered)}</span>${bad.map(([ip,d])=>`<br><span class="note">${esc(nm(ip))}: ${esc(d.detail)}</span>`).join('')}`; }
+      function nm(ip){return stationsById[ip]?.name||ip;}
+      return `<tr><td style="white-space:nowrap">${esc((e.ts||'').slice(5,19).replace('T',' '))}</td><td><span class="tag ${esc(e.type.split('_')[0])}">${esc(e.type)}</span></td><td>${esc(e.operator||'')}</td><td>${summarize(e)}</td><td>${del}</td></tr>`; }).join('')
+      || '<tr><td colspan="5" class="note">No events yet.</td></tr>';
+  } catch(e){}
+}
+$('ev-filter').onchange=loadEvents; $('ev-refresh').onclick=loadEvents;
+$('ev-verify').onclick=async()=>{ try{ const r=await api('/api/events/verify'); toast(r.ok?`Audit chain intact (${r.lines} entries)`:`Audit chain BROKEN at line ${r.first_bad_line}`, r.ok?'ok':'err'); }catch(e){toast(e.message,'err');} };
+
+// ---------------------------------------------------------------- boot
+(async()=>{
+  if (token) { try { const w=await api('/api/me'); await afterLogin(w.user,w.role); return; } catch(e){} }
+  showLogin();
+})();
 </script>
 </body>
 </html>
